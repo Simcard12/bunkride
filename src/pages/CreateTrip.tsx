@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Car, Bus, TrainFront, TramFront, Bike } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +20,7 @@ const CreateTrip = () => {
     to: '',
     date: '',
     time: '',
+    vehicleMode: 'car',
     totalSeats: 2,
     totalCost: 1000
   });
@@ -39,6 +41,17 @@ const CreateTrip = () => {
     return Math.round(formData.totalCost / formData.totalSeats);
   };
 
+  const getVehicleIcon = (mode: string) => {
+    switch (mode) {
+      case 'car': return Car;
+      case 'bus': return Bus;
+      case 'train': return TrainFront;
+      case 'metro': return TramFront;
+      case 'bike': return Bike;
+      default: return Car;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -50,6 +63,7 @@ const CreateTrip = () => {
         to: formData.to,
         date: formData.date,
         time: formData.time,
+        vehicleMode: formData.vehicleMode,
         availableSeats: formData.totalSeats,
         totalSeats: formData.totalSeats,
         pricePerPerson: calculatePricePerPerson(),
@@ -155,6 +169,54 @@ const CreateTrip = () => {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Vehicle Mode */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicle">Mode of Transport</Label>
+                <Select 
+                  value={formData.vehicleMode} 
+                  onValueChange={(value) => handleInputChange('vehicleMode', value)}
+                >
+                  <SelectTrigger>
+                    <div className="flex items-center gap-2">
+                      {React.createElement(getVehicleIcon(formData.vehicleMode), { size: 18 })}
+                      <SelectValue />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="car">
+                      <div className="flex items-center gap-2">
+                        <Car size={16} />
+                        <span>Car/Taxi</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="bus">
+                      <div className="flex items-center gap-2">
+                        <Bus size={16} />
+                        <span>Bus</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="train">
+                      <div className="flex items-center gap-2">
+                        <TrainFront size={16} />
+                        <span>Train</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="metro">
+                      <div className="flex items-center gap-2">
+                        <TramFront size={16} />
+                        <span>Metro</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="bike">
+                      <div className="flex items-center gap-2">
+                        <Bike size={16} />
+                        <span>Bike/Scooter</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Seats and Pricing */}
