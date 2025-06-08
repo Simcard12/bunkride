@@ -217,7 +217,7 @@ const FindTrips = () => {
                     <SelectValue placeholder="Min seats needed" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Any</SelectItem>
+                    <SelectItem value="any">Any</SelectItem>
                     <SelectItem value="1">1+ seats</SelectItem>
                     <SelectItem value="2">2+ seats</SelectItem>
                     <SelectItem value="3">3+ seats</SelectItem>
