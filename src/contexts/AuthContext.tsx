@@ -9,7 +9,6 @@ interface User {
   phone: string;
   profilePicture?: string;
   year?: string;
-  department?: string;
 }
 
 interface AuthContextType {
@@ -50,8 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       email: email,
       college: email.split('@')[1].split('.')[0],
       phone: '+91 98765 43210',
-      year: 'Final Year',
-      department: 'Computer Science'
+      year: 'Final Year'
     };
 
     setUser(mockUser);

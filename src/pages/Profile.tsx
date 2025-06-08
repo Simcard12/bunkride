@@ -18,7 +18,6 @@ const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [privacySettings, setPrivacySettings] = useState({
     showFullName: true,
-    showDepartment: true,
     showYear: true,
   });
 
@@ -84,10 +83,6 @@ const Profile = () => {
                           <Label htmlFor="edit-year">Year</Label>
                           <Input id="edit-year" defaultValue={user.year} />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-department">Department</Label>
-                          <Input id="edit-department" defaultValue={user.department} />
-                        </div>
                         <Button className="w-full" onClick={() => toast.info("Save functionality coming soon!")}>
                           Save Changes
                         </Button>
@@ -108,7 +103,7 @@ const Profile = () => {
                     <h2 className="text-2xl font-bold">{user.name}</h2>
                     <p className="text-muted-foreground">{user.email}</p>
                     <p className="text-sm text-muted-foreground capitalize">
-                      {user.college} • {user.year} • {user.department}
+                      {user.college} • {user.year}
                     </p>
                   </div>
                 </div>
@@ -150,19 +145,6 @@ const Profile = () => {
                   <Switch
                     checked={privacySettings.showFullName}
                     onCheckedChange={(checked) => handlePrivacyToggle('showFullName', checked)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Show Department</h4>
-                    <p className="text-sm text-muted-foreground">
-                      Display your department on your profile
-                    </p>
-                  </div>
-                  <Switch
-                    checked={privacySettings.showDepartment}
-                    onCheckedChange={(checked) => handlePrivacyToggle('showDepartment', checked)}
                   />
                 </div>
 
