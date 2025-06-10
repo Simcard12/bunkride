@@ -182,7 +182,7 @@ const Profile = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-primary">5</div>
+                  <div className="text-3xl font-bold text-primary">0</div>
                   <p className="text-sm text-muted-foreground">Trips Created</p>
                 </div>
                 <div className="text-center">

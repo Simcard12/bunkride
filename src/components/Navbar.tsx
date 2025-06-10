@@ -20,19 +20,18 @@ const Navbar = () => {
   const isHomePage = location.pathname === '/';
 
   return (
-    <nav className="bg-white/90 backdrop-blur-md border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10">
+    <nav className="w-full bg-white/90 backdrop-blur-md border-b border-border sticky top-0 z-50">
+      <div className="w-full max-w-[100vw] px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <div 
-            className="flex items-center cursor-pointer gap-3 hover:opacity-80 transition-opacity" 
+            className="flex items-center cursor-pointer hover:opacity-80 transition-opacity" 
             onClick={() => navigate(isAuthenticated ? '/dashboard' : '/')}
           >
             <img 
-              src="/images/Your paragraph text.png" 
-              alt="BunkRide Logo" 
-              className="h-9 w-9 object-contain"
+              src="/images/BUNK-removebg-preview.png" 
+              alt="BunkRide" 
+              className="h-52 object-contain"
             />
-            <div className="text-2xl font-bold text-primary">BunkRide</div>
           </div>
 
           <div className="flex items-center space-x-6">
