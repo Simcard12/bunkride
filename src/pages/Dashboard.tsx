@@ -1,13 +1,22 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ref, query, orderByChild, equalTo, onValue, get, update, getDatabase } from "firebase/database";
+import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+
+interface TripRequest {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: number;
+}
 
 interface Trip {
   id: string;
@@ -15,17 +24,17 @@ interface Trip {
   to: string;
   date: string;
   time: string;
+  vehicleMode: string;
   availableSeats: number;
   totalSeats: number;
   pricePerPerson: number;
-  createdBy: string;
+  totalTripCost: number;
+  creatorId: string;
+  creatorName: string;
+  creatorCollege: string;
   status: 'active' | 'completed' | 'cancelled';
-  requests?: Array<{
-    id: string;
-    userName: string;
-    userEmail: string;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
+  createdAt: number; // Assuming serverTimestamp resolves to a number
+  requests?: { [userId: string]: Omit<TripRequest, 'userId'> };
 }
 
 const Dashboard = () => {
@@ -36,69 +45,161 @@ const Dashboard = () => {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       navigate('/login');
+      setTrips([]);
+      setMyTrips([]);
+      localStorage.removeItem('bunkride_trips');
+      localStorage.removeItem('bunkride_my_trips');
       return;
     }
 
-    // Load trips from localStorage
-    const storedTrips = localStorage.getItem('bunkride_trips');
-    const storedMyTrips = localStorage.getItem('bunkride_my_trips');
+    const database = getDatabase();
     
-    if (storedTrips) {
-      setTrips(JSON.parse(storedTrips));
-    }
-    
-    if (storedMyTrips) {
-      setMyTrips(JSON.parse(storedMyTrips));
-    }
-  }, [isAuthenticated, navigate]);
+    // Fetch all trips for 'Upcoming Trips'
+    const allTripsRef = ref(database, 'trips');
+    const unsubscribeAllTrips = onValue(allTripsRef, (snapshot) => {
+      const data = snapshot.val();
+      const loadedTrips: Trip[] = [];
+      if (data) {
+        for (const key in data) {
+          loadedTrips.push({ id: key, ...data[key] });
+        }
+        setTrips(loadedTrips);
+        localStorage.setItem('bunkride_trips', JSON.stringify(loadedTrips));
+      } else {
+        setTrips([]);
+        localStorage.removeItem('bunkride_trips');
+      }
+    });
+
+    // Fetch user's created trips for 'My Created Trips'
+    const myTripsQuery = query(ref(database, 'trips'), orderByChild('creatorId'), equalTo(user.id));
+    const unsubscribeMyTrips = onValue(myTripsQuery, (snapshot) => {
+      const data = snapshot.val();
+      const loadedMyTrips: Trip[] = [];
+      if (data) {
+        for (const key in data) {
+          loadedMyTrips.push({ id: key, ...data[key] });
+        }
+        setMyTrips(loadedMyTrips);
+        localStorage.setItem('bunkride_my_trips', JSON.stringify(loadedMyTrips));
+      } else {
+        setMyTrips([]);
+        localStorage.removeItem('bunkride_my_trips');
+      }
+    });
+
+    // Cleanup listeners on component unmount
+    return () => {
+      unsubscribeAllTrips();
+      unsubscribeMyTrips();
+    };
+  }, [isAuthenticated, user, navigate]);
 
   const handleManageRequests = (trip: Trip) => {
     setSelectedTrip(trip);
   };
 
-  const handleRequestAction = (tripId: string, requestId: string, action: 'approve' | 'reject') => {
-    setMyTrips(prevTrips => 
-      prevTrips.map(trip => {
-        if (trip.id === tripId) {
-          const updatedTrip = {
-            ...trip,
-            requests: trip.requests?.map(req => 
-              req.id === requestId ? { ...req, status: action === 'approve' ? 'approved' as const : 'rejected' as const } : req
-            )
-          };
-          
-          if (action === 'approve') {
-            updatedTrip.availableSeats = Math.max(0, updatedTrip.availableSeats - 1);
+  const handleRequestAction = async (tripId: string, userId: string, action: 'approve' | 'reject') => {
+    try {
+      const database = getDatabase();
+      const db = database;
+      const tripRef = ref(db, `trips/${tripId}`);
+      const requestRef = ref(db, `trips/${tripId}/requests/${userId}`);
+      
+      // Get current trip data
+      const snapshot = await get(tripRef);
+      const tripData = snapshot.val();
+      
+      if (!tripData) {
+        console.error('Trip not found');
+        return;
+      }
+      
+      // Update request status
+      const newStatus = action === 'approve' ? 'approved' : 'rejected';
+      await update(requestRef, { status: newStatus });
+      
+      // If approving, update available seats
+      if (action === 'approve') {
+        const newAvailableSeats = Math.max(0, (tripData.availableSeats || tripData.totalSeats) - 1);
+        await update(tripRef, { availableSeats: newAvailableSeats });
+      }
+      
+      // Update local state
+      setMyTrips(prevTrips => 
+        prevTrips.map(trip => {
+          if (trip.id === tripId) {
+            const updatedRequests = { ...(trip.requests || {}) };
+            if (updatedRequests[userId]) {
+              updatedRequests[userId] = {
+                ...updatedRequests[userId],
+                status: newStatus
+              };
+              
+              const updatedTrip = {
+                ...trip,
+                requests: updatedRequests,
+                availableSeats: action === 'approve' 
+                  ? Math.max(0, trip.availableSeats - 1) 
+                  : trip.availableSeats
+              };
+              
+              return updatedTrip;
+            }
           }
-          
-          return updatedTrip;
+          return trip;
+        })
+      );
+      
+      // Update localStorage
+      const updatedMyTrips = myTrips.map(trip => {
+        if (trip.id === tripId) {
+          const updatedRequests = { ...(trip.requests || {}) };
+          if (updatedRequests[userId]) {
+            updatedRequests[userId] = {
+              ...updatedRequests[userId],
+              status: newStatus
+            };
+            
+            const updatedTrip = {
+              ...trip,
+              requests: updatedRequests,
+              availableSeats: action === 'approve' 
+                ? Math.max(0, trip.availableSeats - 1) 
+                : trip.availableSeats
+            };
+            
+            return updatedTrip;
+          }
         }
         return trip;
-      })
-    );
-    
-    // Update localStorage
-    const updatedMyTrips = myTrips.map(trip => {
-      if (trip.id === tripId) {
-        const updatedTrip = {
-          ...trip,
-          requests: trip.requests?.map(req => 
-            req.id === requestId ? { ...req, status: action === 'approve' ? 'approved' as const : 'rejected' as const } : req
-          )
-        };
-        
-        if (action === 'approve') {
-          updatedTrip.availableSeats = Math.max(0, updatedTrip.availableSeats - 1);
-        }
-        
-        return updatedTrip;
+      });
+      
+      localStorage.setItem('bunkride_my_trips', JSON.stringify(updatedMyTrips));
+      
+      // Show success message with celebration for approved requests
+      if (action === 'approve') {
+        toast.success(
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-bold">🎉 Congratulations! 🎉</span>
+            <span>Your BunkRide has been approved!</span>
+            <span className="text-sm text-muted-foreground">Get ready for your trip!</span>
+          </div>,
+          {
+            duration: 5000,
+            className: 'bg-green-50 border-green-200',
+          }
+        );
+      } else {
+        toast.success(`Request rejected successfully`);
       }
-      return trip;
-    });
-    
-    localStorage.setItem('bunkride_my_trips', JSON.stringify(updatedMyTrips));
+      
+    } catch (error) {
+      console.error('Error updating request:', error);
+      toast.error(`Failed to ${action} request`);
+    }
   };
 
   const upcomingTrips = trips.filter(trip => new Date(trip.date) >= new Date() && trip.status === 'active');
@@ -205,11 +306,12 @@ const Dashboard = () => {
                               size="sm" 
                               variant="outline"
                               onClick={() => handleManageRequests(trip)}
+                              className="flex items-center gap-1.5"
                             >
-                              Manage Requests
-                              {trip.requests?.filter(r => r.status === 'pending').length ? (
-                                <Badge className="ml-2 h-5 w-5 rounded-full p-0 text-xs">
-                                  {trip.requests.filter(r => r.status === 'pending').length}
+                              <span>Manage Requests</span>
+                              {trip.requests ? (
+                                <Badge className="h-5 w-5 flex items-center justify-center rounded-full p-0 text-xs">
+                                  {Object.values(trip.requests).filter(r => r.status === 'pending').length}
                                 </Badge>
                               ) : null}
                             </Button>
@@ -217,30 +319,33 @@ const Dashboard = () => {
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Manage Trip Requests</DialogTitle>
+                              <DialogDescription>
+                                Review and approve or reject requests for this trip.
+                              </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
-                              {trip.requests?.length === 0 || !trip.requests ? (
+                              {!trip.requests || Object.keys(trip.requests).length === 0 ? (
                                 <p className="text-muted-foreground">No requests yet</p>
                               ) : (
-                                trip.requests.map((request) => (
-                                  <div key={request.id} className="flex items-center justify-between p-3 border rounded">
+                                Object.entries(trip.requests).map(([userId, request]) => (
+                                  <div key={userId} className="flex items-center justify-between p-3 border rounded">
                                     <div>
-                                      <p className="font-medium">{request.userName}</p>
-                                      <p className="text-sm text-muted-foreground">{request.userEmail}</p>
+                                      <p className="font-medium">{request.userName || 'Unknown User'}</p>
+                                      <p className="text-sm text-muted-foreground">{request.userEmail || 'No email provided'}</p>
                                     </div>
                                     <div className="flex gap-2">
                                       {request.status === 'pending' ? (
                                         <>
                                           <Button 
                                             size="sm" 
-                                            onClick={() => handleRequestAction(trip.id, request.id, 'approve')}
+                                            onClick={() => handleRequestAction(trip.id, userId, 'approve')}
                                           >
                                             Approve
                                           </Button>
                                           <Button 
                                             size="sm" 
                                             variant="outline"
-                                            onClick={() => handleRequestAction(trip.id, request.id, 'reject')}
+                                            onClick={() => handleRequestAction(trip.id, userId, 'reject')}
                                           >
                                             Reject
                                           </Button>

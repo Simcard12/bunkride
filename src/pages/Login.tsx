@@ -17,10 +17,11 @@ const Login = () => {
     password: "",
     phone: "",
     year: "",
-    college: ""
+    // college: "" // College is now derived from email in AuthContext
   });
   
-  const { login, signup } = useAuth();
+  // Destructure new items from useAuth
+  const { login, signup, isLoading, firebaseUser, sendVerificationEmail } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -29,33 +30,54 @@ const Login = () => {
     if (isLogin) {
       const success = await login(formData.email, formData.password);
       if (success) {
+        // AuthContext now handles email verification check before setting isAuthenticated
+        // If login returns true, email is verified and user profile is loaded.
         toast.success("Login successful!");
         navigate("/dashboard");
       } else {
-        toast.error("Invalid credentials");
+        // Error toast is handled by AuthContext, but you can add specific UI updates here if needed
+        // For example, if firebaseUser exists but email is not verified, prompt to resend.
+        if (firebaseUser && !firebaseUser.emailVerified) {
+            toast.info("Your email is not verified. Please check your inbox or resend the verification email.");
+        } else {
+            // General invalid credentials message is handled by AuthContext
+        }
       }
-    } else {
-      // Validate college email
-      const collegeDomains = ['thapar.edu', 'chitkara.edu', 'bits.edu', 'iiit.ac.in', 'iit.ac.in'];
-      const emailDomain = formData.email.split('@')[1];
+    } else { // Signup
+      // .edu check is now in AuthContext's signup function.
       
-      if (!collegeDomains.includes(emailDomain)) {
-        toast.error("Please use a valid college email address");
-        return;
-      }
+      const signupData = {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone,
+        year: formData.year,
+      };
       
-      const success = await signup(formData);
+      const success = await signup(signupData);
       if (success) {
-        toast.success("Account created successfully!");
-        navigate("/dashboard");
+        // Success means signup process initiated, verification email sent.
+        // User is not yet fully authenticated for app access.
+        toast.success("Account created! Please check your email to verify your account.");
+        setIsLogin(true); // Switch to login form so they can login after verification
       } else {
-        toast.error("Signup failed");
+        // Error toast is handled by AuthContext
       }
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleResendVerification = async () => {
+    if (firebaseUser && !firebaseUser.emailVerified) {
+      try {
+        await sendVerificationEmail();
+      } catch (error) {
+        // Error toast is handled by sendVerificationEmail in AuthContext
+      }
+    }
   };
 
   return (
@@ -78,6 +100,7 @@ const Login = () => {
                     value={formData.name}
                     onChange={(e) => handleInputChange('name', e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 
@@ -89,12 +112,17 @@ const Login = () => {
                     value={formData.phone}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
                     required
+                    disabled={isLoading}
                   />
                 </div>
                 
                 <div className="space-y-2">
                   <Label htmlFor="year">Year of Study</Label>
-                  <Select value={formData.year} onValueChange={(value) => handleInputChange('year', value)}>
+                  <Select 
+                    value={formData.year} 
+                    onValueChange={(value) => handleInputChange('year', value)}
+                    disabled={isLoading}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select your year" />
                     </SelectTrigger>
@@ -110,7 +138,7 @@ const Login = () => {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">College Email</Label>
+              <Label htmlFor="email">College Email (.edu only)</Label>
               <Input
                 id="email"
                 type="email"
@@ -118,6 +146,7 @@ const Login = () => {
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="your.name@college.edu"
                 required
+                disabled={isLoading}
               />
             </div>
             
@@ -129,19 +158,35 @@ const Login = () => {
                 value={formData.password}
                 onChange={(e) => handleInputChange('password', e.target.value)}
                 required
+                disabled={isLoading}
               />
             </div>
             
-            <Button type="submit" className="w-full">
-              {isLogin ? "Sign In" : "Create Account"}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (isLogin ? "Signing In..." : "Creating Account...") : (isLogin ? "Sign In" : "Create Account")}
             </Button>
           </form>
+
+          {isLogin && firebaseUser && !firebaseUser.emailVerified && (
+            <div className="mt-4 text-center">
+              <p className="text-sm text-orange-600">Your email is not verified.</p>
+              <Button
+                variant="link"
+                onClick={handleResendVerification}
+                disabled={isLoading}
+                className="text-sm"
+              >
+                {isLoading ? "Sending..." : "Resend verification email"}
+              </Button>
+            </div>
+          )}
           
           <div className="mt-4 text-center">
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
               className="text-sm text-primary hover:underline"
+              disabled={isLoading}
             >
               {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>

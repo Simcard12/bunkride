@@ -9,171 +9,162 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns"; // Added startOfDay
 import { toast } from "sonner";
+import { database } from "@/firebase";
+import { ref, onValue, query, orderByChild, equalTo, set, serverTimestamp, remove, get } from "firebase/database";
+
+// Updated TripRequest and Trip interfaces
+interface TripRequest {
+  userId: string; 
+  userName: string;
+  userEmail: string; 
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: number; // Firebase Server Timestamp
+}
 
 interface Trip {
-  id: string;
+  id: string; // Firebase key
   from: string;
   to: string;
-  date: string;
-  time: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
   availableSeats: number;
   totalSeats: number;
   pricePerPerson: number;
-  createdBy: string;
+  totalTripCost: number; 
+  creatorId: string; // UID of the creator
   creatorName: string;
   creatorCollege: string;
   status: 'active' | 'completed' | 'cancelled';
-  requests?: Array<{
-    id: string;
-    userName: string;
-    userEmail: string;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
+  createdAt: number; // Firebase Server Timestamp
+  requests?: { [requestingUserId: string]: TripRequest }; 
 }
 
 const FindTrips = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]); // Raw trips from user's college
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [searchDestination, setSearchDestination] = useState("");
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  // selectedTrip state seems unused, consider removing if not needed for a modal later
+  // const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [dateFilter, setDateFilter] = useState("");
   const [seatsFilter, setSeatsFilter] = useState("");
+  const [isLoading, setIsLoading] = useState(true); // Added loading state
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
+    if (!isAuthenticated || !user || !user.college) {
+      if (!isAuthenticated) navigate('/login');
+      setIsLoading(false);
       return;
     }
 
-    // Load trips from localStorage or use mock data
-    const storedTrips = localStorage.getItem('bunkride_trips');
-    let allTrips: Trip[] = [];
-
-    if (storedTrips) {
-      allTrips = JSON.parse(storedTrips);
-    } else {
-      // Mock data for demonstration
-      allTrips = [
-        {
-          id: '1',
-          from: 'Patiala',
-          to: 'Delhi',
-          date: '2024-06-15',
-          time: '09:00',
-          availableSeats: 3,
-          totalSeats: 4,
-          pricePerPerson: 800,
-          createdBy: 'user2',
-          creatorName: 'Priya Singh',
-          creatorCollege: 'thapar',
-          status: 'active',
-          requests: []
-        },
-        {
-          id: '2',
-          from: 'Chandigarh',
-          to: 'Mumbai',
-          date: '2024-06-16',
-          time: '06:00',
-          availableSeats: 2,
-          totalSeats: 4,
-          pricePerPerson: 2500,
-          createdBy: 'user3',
-          creatorName: 'Rohit Kumar',
-          creatorCollege: 'chitkara',
-          status: 'active',
-          requests: []
-        },
-        {
-          id: '3',
-          from: 'Jalandhar',
-          to: 'Bangalore',
-          date: '2024-06-18',
-          time: '22:00',
-          availableSeats: 1,
-          totalSeats: 3,
-          pricePerPerson: 3200,
-          createdBy: 'user4',
-          creatorName: 'Ankit Sharma',
-          creatorCollege: 'lpu',
-          status: 'active',
-          requests: []
-        }
-      ];
-      localStorage.setItem('bunkride_trips', JSON.stringify(allTrips));
-    }
-
-    setTrips(allTrips);
-    setFilteredTrips(allTrips.filter(trip => trip.status === 'active' && new Date(trip.date) >= new Date()));
-  }, [isAuthenticated, navigate]);
-
-  useEffect(() => {
-    let filtered = trips.filter(trip => 
-      trip.status === 'active' && 
-      new Date(trip.date) >= new Date() &&
-      trip.createdBy !== user?.id
+    setIsLoading(true);
+    const tripsQuery = query(
+      ref(database, 'trips'), 
+      orderByChild('creatorCollege'), 
+      equalTo(user.college)
     );
 
+    const unsubscribe = onValue(tripsQuery, (snapshot) => {
+      const tripsData = snapshot.val();
+      const loadedTrips: Trip[] = [];
+      if (tripsData) {
+        Object.keys(tripsData).forEach(key => {
+          const trip = { ...tripsData[key], id: key }; // Ensure id is set from the Firebase key
+          // Apply initial filters: active, future, and not created by current user
+          if (
+            trip.status === 'active' && 
+            startOfDay(new Date(trip.date)) >= startOfDay(new Date()) &&
+            trip.creatorId !== user.id
+          ) {
+            loadedTrips.push(trip);
+          }
+        });
+      }
+      setTrips(loadedTrips.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.time.localeCompare(b.time)));
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Firebase trips fetch error: ", error);
+      toast.error("Failed to load trips.");
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [isAuthenticated, user, navigate]);
+
+  useEffect(() => {
+    // This effect now filters the `trips` state which is already pre-filtered by college, status, date, and creator.
+    let currentFilteredTrips = [...trips];
+
     if (searchDestination) {
-      filtered = filtered.filter(trip => 
+      currentFilteredTrips = currentFilteredTrips.filter(trip => 
         trip.to.toLowerCase().includes(searchDestination.toLowerCase()) ||
         trip.from.toLowerCase().includes(searchDestination.toLowerCase())
       );
     }
 
     if (dateFilter) {
-      filtered = filtered.filter(trip => trip.date === dateFilter);
+      currentFilteredTrips = currentFilteredTrips.filter(trip => trip.date === dateFilter);
     }
 
     if (seatsFilter) {
       const seats = parseInt(seatsFilter);
-      filtered = filtered.filter(trip => trip.availableSeats >= seats);
+      currentFilteredTrips = currentFilteredTrips.filter(trip => trip.availableSeats >= seats);
     }
 
-    setFilteredTrips(filtered);
-  }, [trips, searchDestination, dateFilter, seatsFilter, user?.id]);
+    setFilteredTrips(currentFilteredTrips);
+  }, [trips, searchDestination, dateFilter, seatsFilter]);
 
-  const handleRequestToJoin = (trip: Trip) => {
-    if (!user) return;
+  // Helper to get current user's request for a trip
+  const getUserRequest = (trip: Trip): TripRequest | null => {
+    if (!user || !user.id || !trip.requests) return null;
+    return trip.requests[user.id] || null;
+  };
 
-    // Check if user already sent a request
-    const existingRequest = trip.requests?.find(req => req.userEmail === user.email);
-    if (existingRequest) {
-      toast.error("You have already sent a request for this trip!");
+  const handleRequestToJoin = async (trip: Trip) => {
+    if (!user || !user.id || !user.name || !user.email) {
+      toast.error("User information is missing. Please re-login.");
+      navigate('/login');
+      return;
+    }
+    
+    // Prevent users from sending requests to their own trips
+    if (trip.creatorId === user.id) {
+      toast.error("Bruhhh, you're already in the trip!");
       return;
     }
 
-    const newRequest = {
-      id: Date.now().toString(),
+    if (trip.availableSeats <= 0) {
+      toast.info("This trip is fully booked.");
+      return;
+    }
+
+    const existingUserRequest = getUserRequest(trip);
+    if (existingUserRequest) {
+      toast.info(`You have already sent a '${existingUserRequest.status}' request for this trip.`);
+      return;
+    }
+
+    const requestPath = `trips/${trip.id}/requests/${user.id}`;
+    const newRequestData = {
+      userId: user.id,
       userName: user.name,
-      userEmail: user.email,
-      status: 'pending' as const
-    };
+      userEmail: user.email, 
+      status: 'pending',
+      requestedAt: serverTimestamp()
+    } as const;
 
-    // Update the trip with the new request
-    const updatedTrips = trips.map(t => {
-      if (t.id === trip.id) {
-        return {
-          ...t,
-          requests: [...(t.requests || []), newRequest]
-        };
-      }
-      return t;
-    });
-
-    setTrips(updatedTrips);
-    localStorage.setItem('bunkride_trips', JSON.stringify(updatedTrips));
-    
-    toast.success("Request sent! The host will review your request.");
-  };
-
-  const getUserRequestStatus = (trip: Trip) => {
-    if (!user) return null;
-    return trip.requests?.find(req => req.userEmail === user.email);
+    try {
+      await set(ref(database, requestPath), newRequestData);
+      toast.success("Request sent successfully!");
+      // Optimistic update or rely on onValue is generally better here,
+      // but for simplicity, we'll let onValue handle the update.
+    } catch (error) {
+      console.error("Firebase request join error: ", error);
+      toast.error("Failed to send request. Please try again.");
+    }
   };
 
   if (!isAuthenticated || !user) {
@@ -244,8 +235,10 @@ const FindTrips = () => {
         </Card>
 
         {/* Trips List */}
-        <div className="grid gap-4">
-          {filteredTrips.length === 0 ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isLoading ? (
+            <p className="text-center col-span-full">Loading trips...</p>
+          ) : filteredTrips.length === 0 ? (
             <Card>
               <CardContent className="text-center py-12">
                 <p className="text-muted-foreground mb-4">No trips found matching your criteria</p>
@@ -256,7 +249,7 @@ const FindTrips = () => {
             </Card>
           ) : (
             filteredTrips.map((trip) => {
-              const userRequest = getUserRequestStatus(trip);
+              const userRequest = getUserRequest(trip);
               
               return (
                 <Card key={trip.id} className="hover:shadow-lg transition-shadow">
@@ -275,7 +268,7 @@ const FindTrips = () => {
                           <span className="text-muted-foreground">Host: </span>
                           <span className="font-medium">{trip.creatorName}</span>
                           <Badge variant="secondary" className="ml-2">
-                            {trip.creatorCollege}
+                            {trip.creatorName} ({trip.creatorCollege})
                           </Badge>
                         </div>
                       </div>
@@ -297,12 +290,7 @@ const FindTrips = () => {
                       <div className="flex gap-2">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setSelectedTrip(trip)}
-                            >
-                              View Details
-                            </Button>
+                            <Button variant="outline" size="sm">View Details</Button>
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
@@ -319,7 +307,7 @@ const FindTrips = () => {
                                 <h4 className="font-semibold mb-2">Pricing</h4>
                                 <p>₹{trip.pricePerPerson} per person</p>
                                 <p className="text-sm text-muted-foreground">
-                                  Total trip cost: ₹{trip.pricePerPerson * trip.totalSeats}
+                                  Total trip cost: ₹{trip.totalTripCost}
                                 </p>
                               </div>
                               
@@ -343,26 +331,23 @@ const FindTrips = () => {
                               userRequest.status === 'approved' ? 'default' : 
                               userRequest.status === 'pending' ? 'secondary' : 'destructive'
                             }>
-                              {userRequest.status === 'pending' ? 'Request Sent' : userRequest.status}
+                              {userRequest.status === 'pending' ? 'Request Sent' : userRequest.status.charAt(0).toUpperCase() + userRequest.status.slice(1)}
                             </Badge>
                             {userRequest.status === 'pending' && (
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => {
-                                  // Remove request logic
-                                  const updatedTrips = trips.map(t => {
-                                    if (t.id === trip.id) {
-                                      return {
-                                        ...t,
-                                        requests: t.requests?.filter(req => req.userEmail !== user.email) || []
-                                      };
-                                    }
-                                    return t;
-                                  });
-                                  setTrips(updatedTrips);
-                                  localStorage.setItem('bunkride_trips', JSON.stringify(updatedTrips));
-                                  toast.success("Request removed successfully");
+                                onClick={async () => {
+                                  if (!user || !user.id) return;
+                                  const requestPath = `trips/${trip.id}/requests/${user.id}`;
+                                  try {
+                                    await remove(ref(database, requestPath));
+                                    toast.success("Request removed successfully");
+                                    // Optimistic update or rely on onValue for UI changes.
+                                  } catch (error) {
+                                    console.error("Firebase remove request error: ", error);
+                                    toast.error("Failed to remove request.");
+                                  }
                                 }}
                               >
                                 Remove Request

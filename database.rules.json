@@ -1,0 +1,31 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "trips": {
+      ".read": "auth != null",
+      ".indexOn": ["creatorCollege", "creatorId"],
+      "$tripId": {
+        ".write": "auth != null",
+        "requests": {
+          ".read": "auth != null",
+          ".write": "auth != null",
+          "$requestId": {
+            ".validate": "newData.hasChildren(['userId', 'userName', 'userEmail', 'status', 'requestedAt'])",
+            ".write": "auth != null",
+            "status": {
+              ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'approved' || newData.val() === 'rejected')"
+            },
+            "userId": {
+              ".validate": "newData.isString()"
+            }
+          }
+        }
+      }
+    }
+  }
+}

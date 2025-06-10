@@ -186,12 +186,8 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground">Trips Created</p>
                 </div>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-secondary">12</div>
+                  <div className="text-3xl font-bold text-secondary">0</div>
                   <p className="text-sm text-muted-foreground">Trips Joined</p>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-success">4.8</div>
-                  <p className="text-sm text-muted-foreground">Average Rating</p>
                 </div>
               </CardContent>
             </Card>

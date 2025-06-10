@@ -9,6 +9,14 @@ import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
+interface TripRequest {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt?: number;
+}
+
 interface Trip {
   id: string;
   from: string;
@@ -18,16 +26,11 @@ interface Trip {
   availableSeats: number;
   totalSeats: number;
   pricePerPerson: number;
-  createdBy: string;
+  creatorId: string;  // Changed from createdBy to match the data structure
   creatorName: string;
   creatorCollege: string;
   status: 'active' | 'completed' | 'cancelled';
-  requests?: Array<{
-    id: string;
-    userName: string;
-    userEmail: string;
-    status: 'pending' | 'approved' | 'rejected';
-  }>;
+  requests?: { [userId: string]: Omit<TripRequest, 'userId'> };
 }
 
 const TripDetails = () => {
@@ -52,20 +55,38 @@ const TripDetails = () => {
   }, [id, isAuthenticated, navigate]);
 
   const handleRequestToJoin = () => {
-    if (!trip || !user) return;
+    console.log('handleRequestToJoin called');
+    console.log('Current trip:', trip);
+    console.log('Current user:', user);
+    
+    if (!trip || !user || !user.id) {
+      console.log('Missing trip, user, or user.id');
+      return;
+    }
+
+    // Debug log the comparison
+    console.log(`Comparing trip.creatorId (${trip.creatorId}) with user.id (${user.id})`);
+    
+    // Prevent users from sending requests to their own trips
+    if (trip.creatorId === user.id) {
+      console.log('User is the trip creator, showing error');
+      toast.error("Bruhhh, you're already in the trip!");
+      return;
+    }
 
     // Check if user already sent a request
-    const existingRequest = trip.requests?.find(req => req.userEmail === user.email);
+    const existingRequest = trip.requests?.[user.id];
     if (existingRequest) {
       toast.error("You have already sent a request for this trip!");
       return;
     }
 
     const newRequest = {
-      id: Date.now().toString(),
-      userName: user.name,
-      userEmail: user.email,
-      status: 'pending' as const
+      userId: user.id,
+      userName: user.name || 'Unknown User',
+      userEmail: user.email || '',
+      status: 'pending' as const,
+      requestedAt: Date.now()
     };
 
     // Update the trip with the new request
@@ -76,7 +97,15 @@ const TripDetails = () => {
         if (t.id === trip.id) {
           return {
             ...t,
-            requests: [...(t.requests || []), newRequest]
+            requests: {
+              ...(t.requests || {}),
+              [user.id!]: {
+                userName: user.name || 'Unknown User',
+                userEmail: user.email || '',
+                status: 'pending',
+                requestedAt: Date.now()
+              }
+            }
           };
         }
         return t;
@@ -85,7 +114,15 @@ const TripDetails = () => {
       localStorage.setItem('bunkride_trips', JSON.stringify(updatedTrips));
       setTrip(prev => prev ? {
         ...prev,
-        requests: [...(prev.requests || []), newRequest]
+        requests: {
+          ...(prev.requests || {}),
+          [user.id!]: {
+            userName: user.name || 'Unknown User',
+            userEmail: user.email || '',
+            status: 'pending',
+            requestedAt: Date.now()
+          }
+        }
       } : null);
     }
 
@@ -93,8 +130,9 @@ const TripDetails = () => {
   };
 
   const getUserRequestStatus = () => {
-    if (!user || !trip) return null;
-    return trip.requests?.find(req => req.userEmail === user.email);
+    if (!user?.id || !trip?.requests) return null;
+    const request = trip.requests[user.id];
+    return request ? { ...request, userId: user.id } : null;
   };
 
   if (!isAuthenticated || !user) {
@@ -123,7 +161,7 @@ const TripDetails = () => {
   }
 
   const userRequest = getUserRequestStatus();
-  const isCreator = trip.createdBy === user.id;
+  const isCreator = trip.creatorId === user.id;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">

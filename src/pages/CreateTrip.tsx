@@ -1,14 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Car, Bus, TrainFront, TramFront, Bike } from "lucide-react";
+import { Car, Bus, TrainFront, TramFront, Bike, Plane } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { database } from "@/firebase"; // Import Firebase database instance
+import { ref, push, set, serverTimestamp } from "firebase/database"; // Import Firebase DB functions
 
 const CreateTrip = () => {
   const { user, isAuthenticated } = useAuth();
@@ -24,9 +26,15 @@ const CreateTrip = () => {
     totalCost: 1000
   });
 
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   if (!isAuthenticated) {
-    navigate('/login');
-    return null;
+    // Render nothing or a loading indicator while redirecting
+    return null; 
   }
 
   const handleInputChange = (field: string, value: string | number) => {
@@ -40,61 +48,64 @@ const CreateTrip = () => {
     return Math.round(formData.totalCost / formData.totalSeats);
   };
 
+  const vehicleModes = [
+    { value: 'car', label: 'Car/Taxi', icon: Car },
+    { value: 'bus', label: 'Bus', icon: Bus },
+    { value: 'train', label: 'Train', icon: TrainFront },
+    { value: 'metro', label: 'Metro', icon: TramFront },
+    { value: 'bike', label: 'Bike/Scooter', icon: Bike },
+    { value: 'flight', label: 'Flight', icon: Plane }
+  ];
+
   const getVehicleIcon = (mode: string) => {
-    switch (mode) {
-      case 'car': return Car;
-      case 'bus': return Bus;
-      case 'train': return TrainFront;
-      case 'metro': return TramFront;
-      case 'bike': return Bike;
-      default: return Car;
-    }
+    const vehicle = vehicleModes.find(v => v.value === mode);
+    return vehicle ? vehicle.icon : Car;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user || !user.id || !user.college) {
+      toast.error("User information is missing. Please re-login.");
+      navigate('/login');
+      return;
+    }
     setIsLoading(true);
 
     try {
-      const newTrip = {
-        id: Date.now().toString(),
+      const tripsRef = ref(database, 'trips');
+      const newTripRef = push(tripsRef); // Generate a unique key
+
+      const newTripData = {
+        id: newTripRef.key, // Use Firebase generated key as the trip ID
         from: formData.from,
         to: formData.to,
-        date: formData.date,
-        time: formData.time,
+        date: formData.date, // Store as YYYY-MM-DD
+        time: formData.time, // Store as HH:MM
         vehicleMode: formData.vehicleMode,
-        availableSeats: formData.totalSeats,
+        availableSeats: formData.totalSeats, // Initially, all seats are available
         totalSeats: formData.totalSeats,
         pricePerPerson: calculatePricePerPerson(),
-        createdBy: user?.id || '1',
-        creatorName: user?.name || 'Unknown',
-        creatorCollege: user?.college || 'unknown',
+        totalTripCost: formData.totalCost,
+        creatorId: user.id,
+        creatorName: user.name,
+        creatorCollege: user.college, // Crucial for filtering
         status: 'active' as const,
-        requests: []
+        createdAt: serverTimestamp(), // Firebase server-side timestamp
+        requests: {} // Initialize as an empty object for requests
       };
 
-      // Save to trips list
-      const existingTrips = JSON.parse(localStorage.getItem('bunkride_trips') || '[]');
-      existingTrips.push(newTrip);
-      localStorage.setItem('bunkride_trips', JSON.stringify(existingTrips));
+      await set(newTripRef, newTripData);
 
-      // Save to my trips
-      const existingMyTrips = JSON.parse(localStorage.getItem('bunkride_my_trips') || '[]');
-      existingMyTrips.push(newTrip);
-      localStorage.setItem('bunkride_my_trips', JSON.stringify(existingMyTrips));
-
-      // Show success notification
       toast.success(
         "🎉 Trip Created Successfully!", 
         {
-          description: "Your trip is now live and visible to other students. You can manage requests from your dashboard.",
+          description: "Your trip is now live and visible to other students from your college.",
           duration: 5000,
         }
       );
-
-      // Navigate to dashboard
-      navigate('/dashboard');
+      navigate('/dashboard'); // Or to a 'My Trips' page
     } catch (error) {
+      console.error("Firebase trip creation error: ", error);
       toast.error("Failed to create trip. Please try again.");
     } finally {
       setIsLoading(false);
@@ -180,40 +191,18 @@ const CreateTrip = () => {
                   <SelectTrigger>
                     <div className="flex items-center gap-2">
                       {React.createElement(getVehicleIcon(formData.vehicleMode), { size: 18 })}
-                      <SelectValue />
+                      <span>{vehicleModes.find(v => v.value === formData.vehicleMode)?.label || 'Select...'}</span>
                     </div>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="car">
-                      <div className="flex items-center gap-2">
-                        <Car size={16} />
-                        <span>Car/Taxi</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="bus">
-                      <div className="flex items-center gap-2">
-                        <Bus size={16} />
-                        <span>Bus</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="train">
-                      <div className="flex items-center gap-2">
-                        <TrainFront size={16} />
-                        <span>Train</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="metro">
-                      <div className="flex items-center gap-2">
-                        <TramFront size={16} />
-                        <span>Metro</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="bike">
-                      <div className="flex items-center gap-2">
-                        <Bike size={16} />
-                        <span>Bike/Scooter</span>
-                      </div>
-                    </SelectItem>
+                    {vehicleModes.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        <div className="flex items-center gap-2">
+                          {React.createElement(mode.icon, { size: 16 })}
+                          <span>{mode.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
