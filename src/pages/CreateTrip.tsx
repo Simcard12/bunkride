@@ -23,7 +23,8 @@ const CreateTrip = () => {
     time: '',
     vehicleMode: 'car',
     totalSeats: 2,
-    totalCost: 1000
+    totalCost: 1000,
+    isCostDoubtful: false
   });
 
   useEffect(() => {
@@ -45,6 +46,7 @@ const CreateTrip = () => {
   };
 
   const calculatePricePerPerson = () => {
+    if (formData.isCostDoubtful) return -1; // -1 indicates cost is doubtful
     return Math.round(formData.totalCost / formData.totalSeats);
   };
 
@@ -229,20 +231,49 @@ const CreateTrip = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cost">Total Trip Cost (₹)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    placeholder="Total estimated cost for the trip"
-                    value={formData.totalCost}
-                    onChange={(e) => handleInputChange('totalCost', parseInt(e.target.value) || 0)}
-                    min="100"
-                    step="50"
-                    required
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Include fuel, tolls, and other expenses
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="cost">Total Trip Cost (₹)</Label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="isCostDoubtful"
+                        checked={formData.isCostDoubtful}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setFormData(prev => ({
+                            ...prev,
+                            isCostDoubtful: isChecked,
+                            totalCost: isChecked ? 0 : 1000 // Reset to default if unchecked
+                          }));
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <Label htmlFor="isCostDoubtful" className="text-sm font-normal">
+                        Not sure about cost?
+                      </Label>
+                    </div>
+                  </div>
+                  {formData.isCostDoubtful ? (
+                    <div className="rounded-md border border-yellow-300 bg-yellow-50 p-3 text-sm text-yellow-800">
+                      You can discuss and finalize the cost with your travel companions later.
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        id="cost"
+                        type="number"
+                        placeholder="Total estimated cost for the trip"
+                        value={formData.totalCost}
+                        onChange={(e) => handleInputChange('totalCost', parseInt(e.target.value) || 0)}
+                        min="100"
+                        step="50"
+                        required
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Include fuel, tolls, and other expenses
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 {/* Cost Breakdown */}

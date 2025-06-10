@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ref, query, orderByChild, equalTo, onValue, get, update, getDatabase } from "firebase/database";
+import { ref, query, orderByChild, equalTo, onValue, get, update, getDatabase, child, set, serverTimestamp, push } from "firebase/database";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { database } from "@/firebase";
 
 interface TripRequest {
   userId: string;
@@ -29,12 +30,14 @@ interface Trip {
   totalSeats: number;
   pricePerPerson: number;
   totalTripCost: number;
+  isCostDoubtful?: boolean;
   creatorId: string;
   creatorName: string;
+  creatorPhone?: string;
   creatorCollege: string;
   status: 'active' | 'completed' | 'cancelled';
-  createdAt: number; // Assuming serverTimestamp resolves to a number
-  requests?: { [userId: string]: Omit<TripRequest, 'userId'> };
+  createdAt: number;
+  requests?: { [userId: string]: Omit<TripRequest, 'userId'> & { phone?: string } };
 }
 
 const Dashboard = () => {
@@ -43,6 +46,8 @@ const Dashboard = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [myTrips, setMyTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [userProfiles, setUserProfiles] = useState<{[key: string]: {name: string; phone: string}}>({});
+  const [tripContacts, setTripContacts] = useState<{[tripId: string]: Array<{name: string; phone: string; isCreator: boolean}> | null}>({});
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -99,6 +104,65 @@ const Dashboard = () => {
 
   const handleManageRequests = (trip: Trip) => {
     setSelectedTrip(trip);
+  };
+
+  const handleRequestToJoin = async (trip: Trip) => {
+    if (!user || !user.id || !user.name || !user.email) {
+      toast.error("User information is missing. Please re-login.");
+      navigate('/login');
+      return;
+    }
+    
+    // Prevent users from sending requests to their own trips
+    if (trip.creatorId === user.id) {
+      toast.error("You can't request to join your own trip!");
+      return;
+    }
+
+    if (trip.availableSeats <= 0) {
+      toast.info("This trip is fully booked.");
+      return;
+    }
+
+    // Check if user already has a request for this trip
+    const existingRequest = trip.requests && trip.requests[user.id];
+    if (existingRequest) {
+      toast.info(`You have already sent a '${existingRequest.status}' request for this trip.`);
+      return;
+    }
+
+    const requestPath = `trips/${trip.id}/requests/${user.id}`;
+    const newRequestData = {
+      userId: user.id,
+      userName: user.name,
+      userEmail: user.email, 
+      status: 'pending' as const,
+      requestedAt: Date.now() // Using Date.now() instead of serverTimestamp for type safety
+    };
+
+    try {
+      await set(ref(database, requestPath), newRequestData);
+      toast.success("Request sent successfully!");
+      
+      // Update local state to reflect the new request
+      setTrips(prevTrips => 
+        prevTrips.map(t => {
+          if (t.id === trip.id) {
+            return {
+              ...t,
+              requests: {
+                ...t.requests,
+                [user.id]: newRequestData
+              }
+            };
+          }
+          return t;
+        })
+      );
+    } catch (error) {
+      console.error("Error sending request:", error);
+      toast.error("Failed to send request. Please try again.");
+    }
   };
 
   const handleRequestAction = async (tripId: string, userId: string, action: 'approve' | 'reject') => {
@@ -179,34 +243,181 @@ const Dashboard = () => {
       
       localStorage.setItem('bunkride_my_trips', JSON.stringify(updatedMyTrips));
       
-      // Show success message with celebration for approved requests
+      // Show success message to the trip creator
       if (action === 'approve') {
-        toast.success(
-          <div className="flex flex-col items-center">
-            <span className="text-lg font-bold">🎉 Congratulations! 🎉</span>
-            <span>Your BunkRide has been approved!</span>
-            <span className="text-sm text-muted-foreground">Get ready for your trip!</span>
-          </div>,
-          {
-            duration: 5000,
-            className: 'bg-green-50 border-green-200',
-          }
-        );
+        toast.success(`Request approved! ${tripData.requests?.[userId]?.userName || 'The user'} has been added to your trip.`);
+        
+        // Create a notification for the requester
+        const notificationRef = ref(database, `notifications/${userId}`);
+        const newNotification = {
+          type: 'trip_approved',
+          tripId: tripId,
+          tripFrom: tripData.from,
+          tripTo: tripData.to,
+          tripDate: tripData.date,
+          message: '🎉 Your trip request has been approved! 🎉',
+          read: false,
+          createdAt: Date.now(),
+          createdBy: user.id,
+          createdByName: user.name
+        };
+        
+        // Push the new notification to the database
+        const newNotificationRef = push(notificationRef);
+        await set(newNotificationRef, newNotification);
       } else {
-        toast.success(`Request rejected successfully`);
+        toast.success('Request rejected');
       }
-      
     } catch (error) {
       console.error('Error updating request:', error);
       toast.error(`Failed to ${action} request`);
     }
   };
 
-  const upcomingTrips = trips.filter(trip => new Date(trip.date) >= new Date() && trip.status === 'active');
+  // Filter and sort upcoming trips
+  const upcomingTrips = useMemo(() => {
+    return trips.filter(trip => {
+      const tripDate = new Date(trip.date);
+      return tripDate >= new Date() && trip.status === 'active';
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [trips]);
+
+  // Format price for display
+  const formatPrice = (trip: Trip) => {
+    if (trip.isCostDoubtful) return 'Cost to be discussed';
+    return `₹${trip.pricePerPerson} per person`;
+  };
+
+  // Function to fetch user profile by ID
+  const fetchUserProfile = async (userId: string) => {
+    if (userProfiles[userId]) return userProfiles[userId];
+    
+    try {
+      const dbRef = ref(getDatabase());
+      const snapshot = await get(child(dbRef, `users/${userId}`));
+      if (snapshot.exists()) {
+        const userData = snapshot.val();
+        const profile = {
+          name: userData.name,
+          phone: userData.phone
+        };
+        setUserProfiles(prev => ({
+          ...prev,
+          [userId]: profile
+        }));
+        return profile;
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    }
+    return null;
+  };
+
+  // Update contact info when trips or userProfiles change
+  useEffect(() => {
+    const updateContactInfo = async () => {
+      if (!user) return;
+      
+      console.log('Updating contact info...');
+      const newContacts: {[key: string]: any} = {};
+      
+      for (const trip of upcomingTrips) {
+        console.log('Processing trip:', trip.id, 'Creator:', trip.creatorId, 'Current user:', user.id);
+        const approvedRequests = [];
+        const isUserCreator = trip.creatorId === user.id;
+        
+        // Only show contacts if the current user is part of the trip (creator or approved participant)
+        const tripRequests = trip.requests || {};
+        console.log('Trip requests:', tripRequests);
+        
+        const isUserApprovedParticipant = Object.entries(tripRequests)
+          .some(([userId, req]) => {
+            const isApproved = userId === user.id && req.status === 'approved';
+            console.log(`Checking user ${userId} (${req.userName}):`, { status: req.status, isApproved });
+            return isApproved;
+          });
+          
+        console.log('Is user creator?', isUserCreator);
+        console.log('Is user approved participant?', isUserApprovedParticipant);
+        
+        if (!isUserCreator && !isUserApprovedParticipant) {
+          console.log('User is not part of this trip, skipping...');
+          newContacts[trip.id] = null;
+          continue;
+        }
+
+        console.log('Gathering contact info for trip:', trip.id);
+        // Add other participants (excluding current user)
+        if (isUserCreator) {
+          // If current user is creator, show all approved participants
+          const requests = trip.requests || {};
+          for (const [userId, req] of Object.entries(requests)) {
+            if (req.status === 'approved' && userId !== user.id) {
+              const userProfile = await fetchUserProfile(userId);
+              if (userProfile) {
+                approvedRequests.push({
+                  name: userProfile.name,
+                  phone: userProfile.phone || 'No phone provided',
+                  isCreator: false
+                });
+              }
+            }
+          }
+        } else {
+          // If current user is a participant, show creator and other participants
+          // Show creator
+          const creatorProfile = await fetchUserProfile(trip.creatorId);
+          if (creatorProfile) {
+            approvedRequests.push({
+              name: creatorProfile.name,
+              phone: creatorProfile.phone || 'No phone provided',
+              isCreator: true
+            });
+          }
+          
+          // Show other approved participants (excluding self)
+          const requests = trip.requests || {};
+          for (const [userId, req] of Object.entries(requests)) {
+            if (req.status === 'approved' && userId !== user.id) {
+              const userProfile = await fetchUserProfile(userId);
+              if (userProfile) {
+                approvedRequests.push({
+                  name: userProfile.name,
+                  phone: userProfile.phone || 'No phone provided',
+                  isCreator: false
+                });
+              }
+            }
+          }
+        }
+        
+        console.log(`Found ${approvedRequests.length} contacts for trip ${trip.id}:`, approvedRequests);
+        newContacts[trip.id] = approvedRequests.length > 0 ? approvedRequests : null;
+      }
+      
+      setTripContacts(prev => ({
+        ...prev,
+        ...newContacts
+      }));
+    };
+    
+    if (user) {
+      updateContactInfo();
+    }
+  }, [upcomingTrips, user, userProfiles]);
+  
+  const getContactInfo = (tripId: string) => {
+    return tripContacts[tripId] || null;
+  };
 
   if (!isAuthenticated || !user) {
     return null;
   }
+
+  // Debug: Log the final tripContacts state
+  useEffect(() => {
+    console.log('Current tripContacts:', tripContacts);
+  }, [tripContacts]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
@@ -242,19 +453,71 @@ const Dashboard = () => {
                   {upcomingTrips.slice(0, 3).map((trip) => (
                     <div 
                       key={trip.id} 
-                      className="border rounded-lg p-4 hover:bg-accent/50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/trip/${trip.id}`)}
+                      className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold">{trip.from} → {trip.to}</h3>
-                        <Badge>₹{trip.pricePerPerson}</Badge>
+                      <div>
+                        <div 
+                          className="cursor-pointer"
+                          onClick={() => navigate(`/trip/${trip.id}`)}
+                        >
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-semibold">{trip.from} → {trip.to}</h3>
+                            <Badge variant={trip.isCostDoubtful ? 'outline' : 'default'}>
+                              {formatPrice(trip)}
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {format(new Date(trip.date), 'MMM d, yyyy')} at {trip.time}
+                          </div>
+                          <div className="text-sm mt-1">
+                            {trip.availableSeats} seats available
+                          </div>
+                        </div>
+                        
+                        {/* Request to Join Button */}
+                        {trip.creatorId !== user?.id && (
+                          <div className="mt-3 flex justify-end">
+                            {trip.requests && trip.requests[user?.id || ''] ? (
+                              <Badge variant="outline" className="mt-1">
+                                Request {trip.requests[user.id].status}
+                              </Badge>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRequestToJoin(trip);
+                                }}
+                                disabled={trip.availableSeats <= 0}
+                              >
+                                {trip.availableSeats > 0 ? 'Request to Join' : 'No Seats Available'}
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date(trip.date), 'MMM d, yyyy')} at {trip.time}
-                      </div>
-                      <div className="text-sm mt-1">
-                        {trip.availableSeats} seats available
-                      </div>
+                      
+                      {getContactInfo(trip.id) && (
+                        <div className="mt-3 pt-3 border-t">
+                          <h4 className="text-sm font-medium mb-2">Contact Information:</h4>
+                          <div className="space-y-2">
+                            {getContactInfo(trip.id)?.map((person, index) => (
+                              <div key={index} className="flex justify-between items-center text-sm">
+                                <span className="font-medium">
+                                  {person.name} {person.isCreator && '(Host)'}
+                                </span>
+                                <a 
+                                  href={`tel:${person.phone}`}
+                                  className="text-primary hover:underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {person.phone}
+                                </a>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

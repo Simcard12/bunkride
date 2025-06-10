@@ -4,10 +4,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
+import TripChat from "@/components/TripChat";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface TripRequest {
   userId: string;
@@ -197,8 +199,20 @@ const TripDetails = () => {
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* Trip Information */}
-            <div className="grid md:grid-cols-2 gap-6">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="details">Trip Details</TabsTrigger>
+                <TabsTrigger 
+                  value="chat" 
+                  disabled={!isCreator && (!userRequest || userRequest.status !== 'approved')}
+                >
+                  Group Chat
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details">
+                <div className="space-y-6">
+                  <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-semibold mb-3">Trip Details</h3>
                 <div className="space-y-2 text-sm">
@@ -264,16 +278,39 @@ const TripDetails = () => {
             {!isCreator && (
               <div className="flex gap-4 pt-4 border-t">
                 {userRequest ? (
-                  <div className="flex items-center gap-4">
-                    <Badge variant={
-                      userRequest.status === 'approved' ? 'default' : 
-                      userRequest.status === 'pending' ? 'secondary' : 'destructive'
-                    }>
-                      Request {userRequest.status}
-                    </Badge>
+                  <div className="flex flex-col gap-3 w-full p-4 bg-muted/50 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <Badge 
+                        variant={
+                          userRequest.status === 'approved' ? 'default' : 
+                          userRequest.status === 'pending' ? 'secondary' : 'destructive'
+                        }
+                        className="text-sm py-1.5 px-3"
+                      >
+                        Request {userRequest.status}
+                      </Badge>
+                      {userRequest.status === 'pending' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => {
+                            // Add functionality to remove request
+                            toast.info('Feature to remove request coming soon!');
+                          }}
+                          className="text-sm text-muted-foreground hover:text-foreground"
+                        >
+                          Remove Request
+                        </Button>
+                      )}
+                    </div>
                     {userRequest.status === 'approved' && (
-                      <div className="text-sm text-muted-foreground">
-                        The host will share contact details with you soon.
+                      <div className="text-sm text-muted-foreground mt-1">
+                        🎉 Your request has been approved! The host will share contact details with you soon.
+                      </div>
+                    )}
+                    {userRequest.status === 'pending' && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        Your request is pending approval. The host will review it shortly.
                       </div>
                     )}
                   </div>
@@ -281,7 +318,7 @@ const TripDetails = () => {
                   <Button 
                     onClick={handleRequestToJoin}
                     disabled={trip.availableSeats === 0 || trip.status !== 'active'}
-                    className="flex-1 md:flex-none"
+                    className="w-full py-6 text-base"
                   >
                     {trip.availableSeats === 0 ? 'Fully Booked' : 
                      trip.status !== 'active' ? 'Trip Inactive' : 'Request to Join'}
@@ -299,7 +336,18 @@ const TripDetails = () => {
                 <li>• Coordinate pickup points and payment with the host</li>
                 <li>• Follow college travel policies and safety guidelines</li>
               </ul>
-            </div>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="chat" className="mt-0">
+                {(isCreator || userRequest?.status === 'approved') && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <TripChat tripId={trip.id} userId={user?.id || ''} />
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
