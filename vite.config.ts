@@ -17,6 +17,8 @@ export default defineConfig(({ mode }) => ({
         main: 'index.html',
       },
     },
+    // Ensure static assets are properly handled
+    assetsInlineLimit: 0,
   },
   preview: {
     port: 8080,
