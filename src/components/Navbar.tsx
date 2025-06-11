@@ -75,8 +75,8 @@ const Navbar = () => {
   );
 
   return (
-    <nav className="w-full bg-white/90 backdrop-blur-md border-b border-border sticky top-0 z-50">
-      <div className="w-full max-w-[100vw] px-3 sm:px-4 md:px-6 lg:px-8">
+    <nav className="w-full bg-white/90 backdrop-blur-md border-b border-border fixed top-0 left-0 right-0 z-50">
+      <div className="w-full max-w-full px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center h-16 sm:h-20">
           <div className="flex items-center">
             <Button

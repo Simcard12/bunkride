@@ -252,63 +252,47 @@ const FindTrips = () => {
               const userRequest = getUserRequest(trip);
               
               return (
-                <Card key={trip.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
-                  <CardContent className="pt-6 flex-1 flex flex-col">
-                    <div className="space-y-3 mb-4">
-                      <div className="flex justify-between items-start gap-2">
-                        <h3 className="text-lg md:text-xl font-semibold line-clamp-1">
+                <Card key={trip.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="pt-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold mb-2">
                           {trip.from} → {trip.to}
                         </h3>
-                        <div className="text-right">
-                          <div className="text-xl md:text-2xl font-bold text-primary">
-                            ₹{trip.pricePerPerson}
-                          </div>
-                          <div className="text-xs text-muted-foreground">per person</div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                          <span>{format(new Date(trip.date), 'MMM d, yyyy')}</span>
+                          <span>{trip.time}</span>
+                          <Badge variant="outline">{trip.availableSeats} seats available</Badge>
                         </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        <span className="whitespace-nowrap">{format(new Date(trip.date), 'MMM d, yyyy')}</span>
-                        <span className="text-muted-foreground/50">•</span>
-                        <span className="whitespace-nowrap">{trip.time}</span>
-                        <Badge variant="outline" className="ml-auto">
-                          {trip.availableSeats} seat{trip.availableSeats !== 1 ? 's' : ''} left
-                        </Badge>
-                      </div>
-                      
-                      <div className="text-sm">
-                        <div className="text-muted-foreground">
-                          Total cost: <span className="font-medium">₹{trip.pricePerPerson * trip.totalSeats}</span> 
-                          <span className="text-muted-foreground/80"> ({trip.totalSeats} passengers)</span>
-                        </div>
-                        <div className="mt-1">
+                        <div className="text-sm">
                           <span className="text-muted-foreground">Host: </span>
                           <span className="font-medium">{trip.creatorName}</span>
-                          <Badge variant="secondary" className="ml-2 text-xs">
-                            {trip.creatorCollege}
+                          <Badge variant="secondary" className="ml-2">
+                            {trip.creatorName} ({trip.creatorCollege})
                           </Badge>
                         </div>
                       </div>
+                      
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-primary mb-2">
+                          ₹{trip.pricePerPerson}
+                        </div>
+                        <div className="text-sm text-muted-foreground">per person</div>
+                      </div>
                     </div>
                     
-                    <div className="mt-auto pt-4 border-t">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="text-xs text-muted-foreground flex-1">
-                          {trip.availableSeats > 0 ? (
-                            <span className="text-green-600">Seats available</span>
-                          ) : (
-                            <span className="text-destructive">Fully booked</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 justify-end">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="whitespace-nowrap">
-                                <span className="sr-only sm:not-sr-only">View </span>Details
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-muted-foreground">
+                        Total cost: ₹{trip.pricePerPerson * trip.totalSeats} 
+                        ({trip.totalSeats} passengers)
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">View Details</Button>
+                          </DialogTrigger>
+                          <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Trip Details</DialogTitle>
                             </DialogHeader>
@@ -338,8 +322,8 @@ const FindTrips = () => {
                                 <Badge variant="secondary">{trip.creatorCollege}</Badge>
                               </div>
                             </div>
-                            </DialogContent>
-                          </Dialog>
+                          </DialogContent>
+                        </Dialog>
                         
                         {userRequest ? (
                           <div className="flex items-center gap-2">
@@ -353,20 +337,20 @@ const FindTrips = () => {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                className="whitespace-nowrap"
                                 onClick={async () => {
                                   if (!user || !user.id) return;
                                   const requestPath = `trips/${trip.id}/requests/${user.id}`;
                                   try {
                                     await remove(ref(database, requestPath));
                                     toast.success("Request removed successfully");
+                                    // Optimistic update or rely on onValue for UI changes.
                                   } catch (error) {
                                     console.error("Firebase remove request error: ", error);
                                     toast.error("Failed to remove request.");
                                   }
                                 }}
                               >
-                                <span className="sr-only sm:not-sr-only">Remove </span>Request
+                                Remove Request
                               </Button>
                             )}
                           </div>
@@ -375,7 +359,7 @@ const FindTrips = () => {
                             onClick={() => handleRequestToJoin(trip)}
                             disabled={trip.availableSeats === 0}
                           >
-                            {trip.availableSeats === 0 ? 'Fully Booked' : 'Join'}
+                            {trip.availableSeats === 0 ? 'Fully Booked' : 'Request to Join'}
                           </Button>
                         )}
                       </div>

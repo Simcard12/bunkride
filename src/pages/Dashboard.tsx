@@ -483,10 +483,10 @@ const Dashboard = () => {
   }, [tripContacts]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
-      <Navbar />
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10 relative overflow-hidden">
+      <Navbar className="mb-4" />
       
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-primary mb-2">
             Welcome back, {user?.name?.split(' ')[0]}!
@@ -494,7 +494,7 @@ const Dashboard = () => {
           <p className="text-muted-foreground">Manage your trips and find new travel companions</p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
           {/* Upcoming Trips */}
           <Card>
             <CardHeader>
@@ -516,7 +516,7 @@ const Dashboard = () => {
                   {upcomingTrips.slice(0, 3).map((trip) => (
                     <div 
                       key={trip.id} 
-                      className="border rounded-lg p-4 hover:bg-accent/50 transition-colors"
+                      className="border rounded-lg p-4 hover:bg-accent/50 transition-colors w-full"
                     >
                       <div>
                         <div 
@@ -612,21 +612,21 @@ const Dashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {myTrips.map((trip) => (
-                    <div key={trip.id} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-                        <h3 className="font-semibold text-base sm:text-inherit">{trip.from} → {trip.to}</h3>
-                        <Badge variant={trip.status === 'active' ? 'default' : 'secondary'} className="self-start sm:self-auto">
+                    <div key={trip.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-semibold">{trip.from} → {trip.to}</h3>
+                        <Badge variant={trip.status === 'active' ? 'default' : 'secondary'}>
                           {trip.status}
                         </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground mb-3">
+                      <div className="text-sm text-muted-foreground mb-2">
                         {format(new Date(trip.date), 'MMM d, yyyy')} at {trip.time}
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-2">
-                        <span className="text-sm text-muted-foreground">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mt-2">
+                        <div className="text-sm">
                           {trip.availableSeats}/{trip.totalSeats} seats available
-                        </span>
-                        <div className="flex flex-wrap gap-2">
+                        </div>
+                        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -713,23 +713,23 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/find-trips')}>
+        <div className="mt-8 grid md:grid-cols-3 gap-4">
+          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/find-trips')}>
             <div className="text-2xl mb-2">🔍</div>
-            <h3 className="font-semibold mb-1 text-sm sm:text-base">Find Trips</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">Browse available rides</p>
+            <h3 className="font-semibold mb-1">Find Trips</h3>
+            <p className="text-sm text-muted-foreground">Browse available rides</p>
           </Card>
           
-          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/create-trip')}>
+          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/create-trip')}>
             <div className="text-2xl mb-2">➕</div>
-            <h3 className="font-semibold mb-1 text-sm sm:text-base">Create Trip</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">Start a new ride</p>
+            <h3 className="font-semibold mb-1">Create Trip</h3>
+            <p className="text-sm text-muted-foreground">Start a new ride</p>
           </Card>
           
-          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/profile')}>
+          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/profile')}>
             <div className="text-2xl mb-2">👤</div>
-            <h3 className="font-semibold mb-1 text-sm sm:text-base">Profile</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">Manage your account</p>
+            <h3 className="font-semibold mb-1">Profile</h3>
+            <p className="text-sm text-muted-foreground">Manage your account</p>
           </Card>
         </div>
       </div>

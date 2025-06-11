@@ -47,13 +47,13 @@ const Profile = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
       <Navbar />
       
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-primary mb-2">My Profile</h1>
           <p className="text-muted-foreground">Manage your account settings and privacy</p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {/* Profile Information */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
@@ -108,7 +108,7 @@ const Profile = () => {
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <Label className="text-muted-foreground">Email</Label>
                     <p className="font-medium">{user.email}</p>

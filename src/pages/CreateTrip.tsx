@@ -118,7 +118,7 @@ const CreateTrip = () => {
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
       <Navbar />
       
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-primary mb-2">Create a Trip</h1>
           <p className="text-muted-foreground">Share your ride and connect with fellow students</p>
@@ -160,7 +160,7 @@ const CreateTrip = () => {
               {/* Date and Time */}
               <div className="space-y-2">
                 <Label>When are you leaving?</Label>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
                       <svg className="w-4 h-4 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
@@ -170,7 +170,7 @@ const CreateTrip = () => {
                     <Input
                       id="date"
                       type="date"
-                      className="pl-10 py-5 text-base"
+                      className="pl-10 py-4 text-base"
                       value={formData.date}
                       onChange={(e) => handleInputChange('date', e.target.value)}
                       min={new Date().toISOString().split('T')[0]}
@@ -187,7 +187,7 @@ const CreateTrip = () => {
                     <Input
                       id="time"
                       type="time"
-                      className="pl-10 py-5 text-base"
+                      className="pl-10 py-4 text-base"
                       value={formData.time}
                       onChange={(e) => handleInputChange('time', e.target.value)}
                       required
