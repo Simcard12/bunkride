@@ -9,6 +9,19 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  base: "/",
+  build: {
+    outDir: 'dist',
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+      },
+    },
+  },
+  preview: {
+    port: 8080,
+    strictPort: true,
+  },
   plugins: [
     react(),
     mode === 'development' &&
