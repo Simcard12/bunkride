@@ -303,12 +303,12 @@ const FindTrips = () => {
                         
                         <div className="flex flex-wrap gap-2 justify-end">
                           <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="whitespace-nowrap">
-                              <span className="sr-only sm:not-sr-only">View </span>Details
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="whitespace-nowrap">
+                                <span className="sr-only sm:not-sr-only">View </span>Details
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Trip Details</DialogTitle>
                             </DialogHeader>
@@ -338,8 +338,8 @@ const FindTrips = () => {
                                 <Badge variant="secondary">{trip.creatorCollege}</Badge>
                               </div>
                             </div>
-                          </DialogContent>
-                        </Dialog>
+                            </DialogContent>
+                          </Dialog>
                         
                         {userRequest ? (
                           <div className="flex items-center gap-2">
