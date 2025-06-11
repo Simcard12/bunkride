@@ -612,21 +612,21 @@ const Dashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {myTrips.map((trip) => (
-                    <div key={trip.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold">{trip.from} → {trip.to}</h3>
-                        <Badge variant={trip.status === 'active' ? 'default' : 'secondary'}>
+                    <div key={trip.id} className="border rounded-lg p-4 hover:bg-accent/5 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                        <h3 className="font-semibold text-base sm:text-inherit">{trip.from} → {trip.to}</h3>
+                        <Badge variant={trip.status === 'active' ? 'default' : 'secondary'} className="self-start sm:self-auto">
                           {trip.status}
                         </Badge>
                       </div>
-                      <div className="text-sm text-muted-foreground mb-2">
+                      <div className="text-sm text-muted-foreground mb-3">
                         {format(new Date(trip.date), 'MMM d, yyyy')} at {trip.time}
                       </div>
-                      <div className="flex justify-between items-center gap-2 mt-2">
-                        <span className="text-sm">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-2">
+                        <span className="text-sm text-muted-foreground">
                           {trip.availableSeats}/{trip.totalSeats} seats available
                         </span>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <Dialog>
                             <DialogTrigger asChild>
                               <Button 
@@ -713,23 +713,23 @@ const Dashboard = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid md:grid-cols-3 gap-4">
-          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/find-trips')}>
+        <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/find-trips')}>
             <div className="text-2xl mb-2">🔍</div>
-            <h3 className="font-semibold mb-1">Find Trips</h3>
-            <p className="text-sm text-muted-foreground">Browse available rides</p>
+            <h3 className="font-semibold mb-1 text-sm sm:text-base">Find Trips</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">Browse available rides</p>
           </Card>
           
-          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/create-trip')}>
+          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/create-trip')}>
             <div className="text-2xl mb-2">➕</div>
-            <h3 className="font-semibold mb-1">Create Trip</h3>
-            <p className="text-sm text-muted-foreground">Start a new ride</p>
+            <h3 className="font-semibold mb-1 text-sm sm:text-base">Create Trip</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">Start a new ride</p>
           </Card>
           
-          <Card className="p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/profile')}>
+          <Card className="p-4 sm:p-6 text-center hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/profile')}>
             <div className="text-2xl mb-2">👤</div>
-            <h3 className="font-semibold mb-1">Profile</h3>
-            <p className="text-sm text-muted-foreground">Manage your account</p>
+            <h3 className="font-semibold mb-1 text-sm sm:text-base">Profile</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">Manage your account</p>
           </Card>
         </div>
       </div>
