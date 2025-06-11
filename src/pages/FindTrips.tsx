@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { format, startOfDay } from "date-fns"; // Added startOfDay
+import { format, startOfDay } from "date-fns";
 import { toast } from "sonner";
 import { database } from "@/firebase";
 import { ref, onValue, query, orderByChild, equalTo, set, serverTimestamp, remove, get } from "firebase/database";
+import { CalendarDays, Clock, User, Users, Eye, MapPin, DollarSign } from "lucide-react";
 
 // Updated TripRequest and Trip interfaces
 interface TripRequest {
@@ -172,10 +173,10 @@ const FindTrips = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10 relative overflow-hidden">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 pt-24 pb-6 sm:pt-28 sm:pb-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-primary mb-2">Find Trips</h1>
           <p className="text-muted-foreground">Discover rides shared by fellow students</p>
@@ -235,11 +236,11 @@ const FindTrips = () => {
         </Card>
 
         {/* Trips List */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {isLoading ? (
-            <p className="text-center col-span-full">Loading trips...</p>
+            <p className="text-center col-span-full py-8">Loading trips...</p>
           ) : filteredTrips.length === 0 ? (
-            <Card>
+            <Card className="col-span-full">
               <CardContent className="text-center py-12">
                 <p className="text-muted-foreground mb-4">No trips found matching your criteria</p>
                 <Button onClick={() => navigate('/create-trip')}>
@@ -250,76 +251,149 @@ const FindTrips = () => {
           ) : (
             filteredTrips.map((trip) => {
               const userRequest = getUserRequest(trip);
+              const isTripFull = trip.availableSeats <= 0;
               
               return (
-                <Card key={trip.id} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <h3 className="text-xl font-semibold mb-2">
+                <Card key={trip.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
+                  <CardContent className="p-4 sm:p-6 flex-1 flex flex-col">
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <h3 className="text-lg sm:text-xl font-semibold mb-2 line-clamp-1">
                           {trip.from} → {trip.to}
                         </h3>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                          <span>{format(new Date(trip.date), 'MMM d, yyyy')}</span>
-                          <span>{trip.time}</span>
-                          <Badge variant="outline">{trip.availableSeats} seats available</Badge>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Host: </span>
-                          <span className="font-medium">{trip.creatorName}</span>
-                          <Badge variant="secondary" className="ml-2">
-                            {trip.creatorName} ({trip.creatorCollege})
+                        {isTripFull && (
+                          <Badge variant="destructive" className="shrink-0">
+                            Full
                           </Badge>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3 flex-wrap">
+                        <div className="flex items-center gap-1">
+                          <CalendarDays className="h-4 w-4" />
+                          <span>{format(new Date(trip.date), 'MMM d, yyyy')}</span>
+                        </div>
+                        <span>•</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{trip.time}</span>
                         </div>
                       </div>
                       
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary mb-2">
-                          ₹{trip.pricePerPerson}
+                      <div className="flex items-center gap-2 mb-4">
+                        <Badge variant={isTripFull ? 'destructive' : 'default'} className="shrink-0">
+                          {trip.availableSeats} {trip.availableSeats === 1 ? 'seat' : 'seats'} left
+                        </Badge>
+                        <div className="h-2 flex-1 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${isTripFull ? 'bg-destructive' : 'bg-primary'}`}
+                            style={{ width: `${((trip.totalSeats - trip.availableSeats) / trip.totalSeats) * 100}%` }}
+                          />
                         </div>
-                        <div className="text-sm text-muted-foreground">per person</div>
+                      </div>
+                      
+                      <div className="space-y-3 mb-4">
+                        <div className="flex items-center gap-2 text-sm">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{trip.creatorName}</span>
+                          <Badge variant="secondary" className="ml-auto">
+                            {trip.creatorCollege}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-sm">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Price per person:</span>
+                          <span className="font-semibold text-primary">₹{trip.pricePerPerson}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-sm">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">Total cost for {trip.totalSeats} passengers:</span>
+                          <span className="font-semibold">₹{trip.pricePerPerson * trip.totalSeats}</span>
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-muted-foreground">
-                        Total cost: ₹{trip.pricePerPerson * trip.totalSeats} 
-                        ({trip.totalSeats} passengers)
-                      </div>
-                      
-                      <div className="flex gap-2">
+                    <div className="mt-auto pt-4 border-t">
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">View Details</Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1"
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="max-w-md sm:max-w-lg">
                             <DialogHeader>
-                              <DialogTitle>Trip Details</DialogTitle>
+                              <DialogTitle className="text-xl">Trip Details</DialogTitle>
                             </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <h4 className="font-semibold mb-2">Route & Timing</h4>
-                                <p>{trip.from} → {trip.to}</p>
-                                <p>{format(new Date(trip.date), 'EEEE, MMMM d, yyyy')} at {trip.time}</p>
+                            <div className="space-y-6 py-2">
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-base flex items-center gap-2">
+                                  <MapPin className="h-4 w-4" />
+                                  Route & Timing
+                                </h4>
+                                <div className="pl-6 space-y-1">
+                                  <p className="font-medium">{trip.from} → {trip.to}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {format(new Date(trip.date), 'EEEE, MMMM d, yyyy')} • {trip.time}
+                                  </p>
+                                </div>
                               </div>
                               
-                              <div>
-                                <h4 className="font-semibold mb-2">Pricing</h4>
-                                <p>₹{trip.pricePerPerson} per person</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Total trip cost: ₹{trip.totalTripCost}
-                                </p>
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-base flex items-center gap-2">
+                                  <DollarSign className="h-4 w-4" />
+                                  Pricing
+                                </h4>
+                                <div className="pl-6 space-y-1">
+                                  <p>₹{trip.pricePerPerson} <span className="text-sm text-muted-foreground">per person</span></p>
+                                  <p className="text-sm">
+                                    <span className="text-muted-foreground">Total trip cost:</span>{' '}
+                                    <span className="font-medium">₹{trip.totalTripCost}</span>
+                                  </p>
+                                </div>
                               </div>
                               
-                              <div>
-                                <h4 className="font-semibold mb-2">Availability</h4>
-                                <p>{trip.availableSeats} out of {trip.totalSeats} seats available</p>
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-base flex items-center gap-2">
+                                  <Users className="h-4 w-4" />
+                                  Availability
+                                </h4>
+                                <div className="pl-6">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Badge variant={isTripFull ? 'destructive' : 'default'} className="shrink-0">
+                                      {trip.availableSeats} {trip.availableSeats === 1 ? 'seat' : 'seats'} available
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      {trip.totalSeats - trip.availableSeats} of {trip.totalSeats} seats filled
+                                    </span>
+                                  </div>
+                                  <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full ${isTripFull ? 'bg-destructive' : 'bg-primary'}`}
+                                      style={{ width: `${((trip.totalSeats - trip.availableSeats) / trip.totalSeats) * 100}%` }}
+                                    />
+                                  </div>
+                                </div>
                               </div>
                               
-                              <div>
-                                <h4 className="font-semibold mb-2">Host Information</h4>
-                                <p>{trip.creatorName}</p>
-                                <Badge variant="secondary">{trip.creatorCollege}</Badge>
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-base flex items-center gap-2">
+                                  <User className="h-4 w-4" />
+                                  Host Information
+                                </h4>
+                                <div className="pl-6 space-y-1">
+                                  <p className="font-medium">{trip.creatorName}</p>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {trip.creatorCollege}
+                                  </Badge>
+                                </div>
                               </div>
                             </div>
                           </DialogContent>

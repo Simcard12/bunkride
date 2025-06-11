@@ -115,10 +115,10 @@ const CreateTrip = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-secondary/5 to-accent/10 relative overflow-hidden">
       <Navbar />
       
-      <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
+      <div className="max-w-2xl mx-auto px-4 pt-24 pb-6 sm:pt-28 sm:pb-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-primary mb-2">Create a Trip</h1>
           <p className="text-muted-foreground">Share your ride and connect with fellow students</p>

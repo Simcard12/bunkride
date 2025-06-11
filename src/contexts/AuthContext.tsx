@@ -138,7 +138,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error(error.message || 'Invalid email or password.');
+      const errorMessage = error.code === 'auth/invalid-credential' 
+        ? "Hey there! I think something is wrong with your login details."
+        : error.message || 'Invalid email or password.';
+      toast.error(errorMessage);
       setIsLoading(false);
       return false;
     } finally {
