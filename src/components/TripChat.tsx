@@ -1,20 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { ref, push, onValue, off, query, orderByChild, limitToLast } from 'firebase/database';
-import { database } from '@/firebase';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { format } from 'date-fns';
-
-interface Message {
-  id: string;
-  text: string;
-  userId: string;
-  userName: string;
-  userPhoto?: string;
-  timestamp: number;
-}
 
 interface TripChatProps {
   tripId: string;
@@ -22,72 +6,7 @@ interface TripChatProps {
 }
 
 export default function TripChat({ tripId, userId }: TripChatProps) {
-  const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([]);
   const { user } = useAuth();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!tripId) return;
-
-    const messagesRef = ref(database, `tripChats/${tripId}/messages`);
-    const messagesQuery = query(
-      messagesRef,
-      orderByChild('timestamp'),
-      limitToLast(100)
-    );
-
-    const handleNewMessage = (snapshot: any) => {
-      const messagesData: Message[] = [];
-      snapshot.forEach((childSnapshot: any) => {
-        messagesData.push({
-          id: childSnapshot.key,
-          ...childSnapshot.val(),
-        });
-      });
-      setMessages(messagesData);
-    };
-
-    onValue(messagesQuery, handleNewMessage);
-
-    return () => {
-      off(messagesQuery, 'value', handleNewMessage);
-    };
-  }, [tripId]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!message.trim() || !user) return;
-
-    try {
-      // Create a message object with only defined values
-      const newMessage: any = {
-        text: message,
-        userId: user.id,
-        userName: user.name,
-        timestamp: Date.now(),
-      };
-
-      // Only add userPhoto if it exists
-      if (user.profilePicture) {
-        newMessage.userPhoto = user.profilePicture;
-      }
-
-      const messagesRef = ref(database, `tripChats/${tripId}/messages`);
-      await push(messagesRef, newMessage);
-      setMessage('');
-    } catch (error) {
-      console.error('Error sending message:', error);
-    }
-  };
 
   return (
     <div className="flex flex-col h-[400px] border rounded-lg overflow-hidden">
@@ -95,57 +14,47 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
         <h3 className="font-semibold">Trip Chat</h3>
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            Working on it...
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.userId === userId ? 'justify-end' : 'justify-start'}`}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-primary/10 p-6 rounded-lg max-w-md w-full">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 mb-4">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="h-6 w-6 text-primary"
             >
-              <div
-                className={`flex max-w-[80%] ${msg.userId === userId ? 'flex-row-reverse' : ''}`}
-              >
-                <Avatar className="h-8 w-8 m-1">
-                  <AvatarImage src={msg.userPhoto} />
-                  <AvatarFallback>
-                    {msg.userName?.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div
-                  className={`mx-2 p-3 rounded-lg ${
-                    msg.userId === userId
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-muted rounded-bl-none'
-                  }`}
-                >
-                  <div className="text-xs font-medium mb-1">
-                    {msg.userName} • {format(new Date(msg.timestamp), 'h:mm a')}
-                  </div>
-                  <div>{msg.text}</div>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium mb-2">Coming in the next update!</h3>
+          <p className="text-sm text-muted-foreground">
+            We're working hard to bring you an amazing group chat experience. Stay tuned for the next update!
+          </p>
+        </div>
       </div>
-
-      <form onSubmit={sendMessage} className="p-3 border-t flex gap-2">
-        <Input
-          type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1"
-        />
-        <Button type="submit" disabled={!message.trim()}>
-          Send
-        </Button>
-      </form>
+      
+      <div className="p-4 border-t bg-gray-50">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Chat will be available soon..."
+            className="flex-1 px-4 py-2 border rounded-lg bg-white text-muted-foreground cursor-not-allowed"
+            disabled
+          />
+          <button
+            className="px-4 py-2 bg-primary/10 text-primary rounded-lg font-medium cursor-not-allowed"
+            disabled
+          >
+            Send
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
