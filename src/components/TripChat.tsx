@@ -1,34 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  limit, 
-  DocumentData, 
-  QueryDocumentSnapshot,
-  serverTimestamp,
-  deleteDoc,
-  doc
-} from 'firebase/firestore';
-import { firestore } from '@/firebase';
+import { useChatMessages } from '@/hooks/useChatMessages';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
-
-// Extend the AppUser type to include the properties we need
-declare module '@/contexts/AuthContext' {
-  interface AppUser {
-    uid: string;
-    displayName: string | null;
-    photoURL: string | null;
-    email?: string | null;
-  }
-}
 
 interface Message {
   id: string;
@@ -36,7 +13,7 @@ interface Message {
   userId: string;
   userName: string;
   userPhotoURL?: string;
-  timestamp: any;
+  timestamp: number | { toDate: () => Date } | null;
 }
 
 interface TripChatProps {
@@ -46,41 +23,13 @@ interface TripChatProps {
 
 export default function TripChat({ tripId, userId }: TripChatProps) {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Fetch messages from Firestore
-  useEffect(() => {
-    if (!tripId || !user?.uid) return;
-
-    const messagesRef = collection(firestore, 'trips', tripId, 'messages');
-    const q = query(
-      messagesRef,
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedMessages = snapshot.docs.map((doc: QueryDocumentSnapshot<DocumentData>) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          text: data.text || '',
-          userId: data.userId || '',
-          userName: data.userName || 'Anonymous',
-          userPhotoURL: data.userPhotoURL || '',
-          timestamp: data.timestamp
-        } as Message;
-      });
-      
-      setMessages(fetchedMessages.reverse());
-    });
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
-  }, [tripId, user?.uid]);
+  
+  const { messages, sendMessage, deleteMessage } = useChatMessages(
+    tripId, 
+    user?.uid
+  );
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -89,36 +38,29 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newMessage.trim() || !user?.uid || !tripId) return;
+    if (!newMessage.trim() || !user) return;
 
     try {
-      await addDoc(collection(firestore, 'trips', tripId, 'messages'), {
-        text: newMessage,
-        userId: user.uid,
-        userName: user.displayName || user.name || 'Anonymous',
-        userPhotoURL: user.photoURL || user.profilePicture || '',
-        timestamp: serverTimestamp() as any
+      await sendMessage(newMessage, {
+        uid: user.uid,
+        displayName: user.displayName || user.name || null,
+        photoURL: user.photoURL || user.profilePicture || null,
+        name: user.name,
+        profilePicture: user.profilePicture
       });
-      
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      alert('Failed to send message');
     }
   };
 
-  const handleDeleteMessage = async (messageId: string, messageUserId: string) => {
-    if (!user?.uid || !tripId) return;
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!user?.uid) return;
     
-    // Only allow the message sender or admin to delete messages
-    if (user.uid !== messageUserId) {
-      alert('You can only delete your own messages');
-      return;
-    }
-
     if (window.confirm('Are you sure you want to delete this message?')) {
       try {
-        await deleteDoc(doc(firestore, 'trips', tripId, 'messages', messageId));
+        await deleteMessage(messageId);
       } catch (error) {
         console.error('Error deleting message:', error);
         alert('Failed to delete message');
@@ -126,9 +68,11 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
     }
   };
 
-  const formatTime = (timestamp: any) => {
+  const formatTime = (timestamp: number | { toDate: () => Date } | null) => {
     if (!timestamp) return 'Just now';
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = timestamp instanceof Object && 'toDate' in timestamp 
+      ? timestamp.toDate() 
+      : new Date(timestamp as number);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -175,7 +119,7 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
                       <p className="text-sm font-medium">{message.userName}</p>
                       {user?.uid === message.userId && (
                         <button
-                          onClick={() => handleDeleteMessage(message.id, message.userId)}
+                          onClick={() => handleDeleteMessage(message.id)}
                           className="opacity-0 group-hover:opacity-100 text-xs text-muted-foreground hover:text-destructive transition-opacity px-1 -mt-1 -mr-1"
                           aria-label="Delete message"
                           title="Delete message"
@@ -186,9 +130,7 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
                     </div>
                     <p className="text-sm">{message.text}</p>
                     <p className="text-xs opacity-70 mt-1">
-                      {message.timestamp?.toDate 
-                        ? new Date(message.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : 'Just now'}
+                      {formatTime(message.timestamp)}
                     </p>
                   </div>
                 </div>

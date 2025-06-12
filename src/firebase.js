@@ -29,3 +29,11 @@ const firestore = getFirestore(app);
 
 // Export Firebase services
 export { app, analytics, auth, database, firestore };
+
+export default {
+  app,
+  analytics,
+  auth,
+  database,
+  firestore
+};
