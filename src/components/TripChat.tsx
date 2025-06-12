@@ -9,7 +9,9 @@ import {
   limit, 
   DocumentData, 
   QueryDocumentSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  deleteDoc,
+  doc
 } from 'firebase/firestore';
 import { firestore } from '@/firebase';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -105,6 +107,25 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string, messageUserId: string) => {
+    if (!user?.uid || !tripId) return;
+    
+    // Only allow the message sender or admin to delete messages
+    if (user.uid !== messageUserId) {
+      alert('You can only delete your own messages');
+      return;
+    }
+
+    if (window.confirm('Are you sure you want to delete this message?')) {
+      try {
+        await deleteDoc(doc(firestore, 'trips', tripId, 'messages', messageId));
+      } catch (error) {
+        console.error('Error deleting message:', error);
+        alert('Failed to delete message');
+      }
+    }
+  };
+
   const formatTime = (timestamp: any) => {
     if (!timestamp) return 'Just now';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -135,7 +156,7 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
                 className={`flex ${message.userId === user?.uid ? 'justify-end' : 'justify-start'}`}
               >
                 <div 
-                  className={`flex max-w-[80%] ${message.userId === user?.uid ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}
+                  className={`group relative flex max-w-[80%] ${message.userId === user?.uid ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={message.userPhotoURL} alt={message.userName} />
@@ -144,25 +165,31 @@ export default function TripChat({ tripId, userId }: TripChatProps) {
                     </AvatarFallback>
                   </Avatar>
                   <div 
-                    className={`p-3 rounded-lg ${
+                    className={`p-3 rounded-lg relative group ${
                       message.userId === user?.uid 
-                        ? 'bg-primary text-primary-foreground' 
+                        ? 'bg-primary text-primary-foreground rounded-tr-none' 
                         : 'bg-muted'
                     }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs font-medium ${
-                        message.userId === user?.uid ? 'text-primary-foreground/80' : 'text-muted-foreground'
-                      }`}>
-                        {message.userName}
-                      </span>
-                      <span className={`text-xs ${
-                        message.userId === user?.uid ? 'text-primary-foreground/60' : 'text-muted-foreground/60'
-                      }`}>
-                        {formatTime(message.timestamp)}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{message.userName}</p>
+                      {user?.uid === message.userId && (
+                        <button
+                          onClick={() => handleDeleteMessage(message.id, message.userId)}
+                          className="opacity-0 group-hover:opacity-100 text-xs text-muted-foreground hover:text-destructive transition-opacity px-1 -mt-1 -mr-1"
+                          aria-label="Delete message"
+                          title="Delete message"
+                        >
+                          ×
+                        </button>
+                      )}
                     </div>
                     <p className="text-sm">{message.text}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {message.timestamp?.toDate 
+                        ? new Date(message.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : 'Just now'}
+                    </p>
                   </div>
                 </div>
               </div>
