@@ -32,7 +32,7 @@ const Navbar = () => {
           navigate('/dashboard');
           isMobile && setMobileMenuOpen(false);
         }}
-        className={`w-full justify-start ${location.pathname === '/dashboard' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+        className={`w-full justify-center ${location.pathname === '/dashboard' ? 'bg-accent' : 'hover:bg-accent/50'}`}
       >
         Dashboard
       </Button>
@@ -43,7 +43,7 @@ const Navbar = () => {
           navigate('/find-trips');
           isMobile && setMobileMenuOpen(false);
         }}
-        className={`w-full justify-start ${location.pathname === '/find-trips' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+        className={`w-full justify-center ${location.pathname === '/find-trips' ? 'bg-accent' : 'hover:bg-accent/50'}`}
       >
         Find Trips
       </Button>
@@ -54,7 +54,7 @@ const Navbar = () => {
           navigate('/create-trip');
           isMobile && setMobileMenuOpen(false);
         }}
-        className={`w-full justify-start ${location.pathname === '/create-trip' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+        className={`w-full justify-center ${location.pathname === '/create-trip' ? 'bg-accent' : 'hover:bg-accent/50'}`}
       >
         Create Trip
       </Button>
@@ -66,7 +66,7 @@ const Navbar = () => {
             navigate('/profile');
             isMobile && setMobileMenuOpen(false);
           }}
-          className={`w-full justify-start ${location.pathname === '/profile' ? 'bg-accent' : 'hover:bg-accent/50'}`}
+          className={`w-full justify-center ${location.pathname === '/profile' ? 'bg-accent' : 'hover:bg-accent/50'}`}
         >
           Profile
         </Button>

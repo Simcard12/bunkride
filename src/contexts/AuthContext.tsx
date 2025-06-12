@@ -15,11 +15,14 @@ import { toast } from 'sonner'; // For notifications
 // Your application's User profile structure
 interface AppUser {
   id: string; // Firebase UID
+  uid: string; // Alias for id to match Firebase User
   name: string;
+  displayName: string; // Alias for name to match Firebase User
   email: string;
   college: string; // e.g., "thapar" from "user@thapar.edu"
   phone: string;
   profilePicture?: string;
+  photoURL?: string; // Alias for profilePicture to match Firebase User
   year?: string;
 }
 
@@ -107,42 +110,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
     try {
+      setIsLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Fetch the user's data from the database
+      const userSnapshot = await get(child(ref(database), `users/${firebaseUser.uid}`));
       
-      if (!userCredential.user.emailVerified) {
-        toast.error('Please verify your email before logging in. You can request a new verification email if needed.');
-        setIsLoading(false);
+      if (!userSnapshot.exists()) {
+        toast.error('No user data found. Please sign up again.');
+        await signOut(auth);
         return false;
       }
-      
-      // Wait for the auth state to be updated
-      return new Promise((resolve) => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          if (user && user.emailVerified) {
-            // Only resolve after we've confirmed the user state is updated
-            const userProfileRef = ref(database, `users/${user.uid}`);
-            const snapshot = await get(userProfileRef);
-            if (snapshot.exists()) {
-              setUser({ ...snapshot.val(), id: user.uid } as AppUser);
-              setFirebaseUser(user);
-              setIsAuthenticated(true);
-              resolve(true);
-              return;
-            }
-          }
-          resolve(false);
-          unsubscribe();
-        });
+
+      const userData = userSnapshot.val();
+      setUser({ 
+        id: firebaseUser.uid, 
+        uid: firebaseUser.uid,
+        name: userData.name,
+        displayName: userData.name,
+        email: userData.email,
+        college: userData.college,
+        phone: userData.phone,
+        profilePicture: userData.profilePicture,
+        photoURL: userData.profilePicture,
+        year: userData.year
       });
-    } catch (error: any) {
-      console.error("Login error:", error);
-      const errorMessage = error.code === 'auth/invalid-credential' 
-        ? "Hey there! I think something is wrong with your login details."
-        : error.message || 'Invalid email or password.';
-      toast.error(errorMessage);
-      setIsLoading(false);
+      setFirebaseUser(firebaseUser);
+      setIsAuthenticated(true);
+      return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Failed to log in. Please check your credentials.');
       return false;
     } finally {
       setIsLoading(false);
@@ -169,11 +169,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const collegeName = domainParts.length > 0 ? domainParts[0] : 'unknown';
 
       const userProfile: Omit<AppUser, 'id'> = {
+        uid: userCredential.user.uid,
         name: userData.name,
-        email: fbUser.email!,
+        displayName: userData.name,
+        email: userData.email,
         college: collegeName,
         phone: userData.phone,
-        year: userData.year || '',
+        photoURL: '',
+        year: userData.year,
       };
 
       await set(ref(database, `users/${fbUser.uid}`), userProfile);
