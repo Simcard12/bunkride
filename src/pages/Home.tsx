@@ -22,14 +22,14 @@ const Home = () => {
       <section className="pt-20 pb-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-6">
-            Smart Travel Coordination
+            Hassle free Travel
             <br />
-            <span className="text-4xl md:text-5xl">for Students</span>
+            <span className="text-4xl md:text-5xl">just for Students</span>
           </h1>
           
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            Replace chaotic WhatsApp groups with organized trip planning. 
-            Connect safely with verified students from your institution for intercity rides.
+          Swap group chat clutter for sleek ride plans. Connect with verified 
+          campus pals and enjoy stress free intercity journeys
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
