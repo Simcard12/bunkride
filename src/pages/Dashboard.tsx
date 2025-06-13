@@ -339,11 +339,39 @@ const Dashboard = () => {
 
   // Filter and sort upcoming trips
   const upcomingTrips = useMemo(() => {
+    if (!user) return [];
+
     return trips.filter(trip => {
       const tripDate = new Date(trip.date);
-      return tripDate >= new Date() && trip.status === 'active';
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [trips]);
+      return tripDate >= new Date() && 
+             trip.status === 'active' && 
+             trip.availableSeats > 0; // Only include trips with available seats
+    }).sort((a, b) => {
+      // Priority 1: Trips created by user
+      const isACreator = a.creatorId === user.id;
+      const isBCreator = b.creatorId === user.id;
+      
+      if (isACreator && !isBCreator) return -1;
+      if (!isACreator && isBCreator) return 1;
+
+      // Priority 2: Trips where user is approved
+      const isAApproved = a.requests?.[user.id]?.status === 'approved';
+      const isBApproved = b.requests?.[user.id]?.status === 'approved';
+      
+      if (isAApproved && !isBApproved) return -1;
+      if (!isAApproved && isBApproved) return 1;
+
+      // Priority 3: Trips where user has sent request
+      const hasARequest = a.requests?.[user.id];
+      const hasBRequest = b.requests?.[user.id];
+      
+      if (hasARequest && !hasBRequest) return -1;
+      if (!hasARequest && hasBRequest) return 1;
+
+      // Finally sort by date
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+  }, [trips, user]);
 
   // Format price for display
   const formatPrice = (trip: Trip) => {

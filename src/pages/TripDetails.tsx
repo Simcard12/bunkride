@@ -1,15 +1,17 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
 import TripChat from "@/components/TripChat";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ref, onValue, off, set, remove, get } from "firebase/database";
+import { database } from "@/firebase";
 
 interface TripRequest {
   userId: string;
@@ -37,106 +39,175 @@ interface Trip {
 
 const TripDetails = () => {
   const { id } = useParams();
+  const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [isFromDashboard, setIsFromDashboard] = useState(false);
+  
+  // Check if we came from dashboard or find-trips
+  useEffect(() => {
+    setIsFromDashboard(location.state?.from === 'dashboard');
+  }, [location]);
 
+  // Handle back navigation
+  const handleBack = useCallback(() => {
+    if (isFromDashboard) {
+      navigate('/dashboard?tab=upcoming');
+    } else {
+      navigate('/find-trips');
+    }
+  }, [isFromDashboard, navigate]);
+
+  // Handle request to join trip
+  const handleRequestToJoin = async () => {
+    if (!user || !trip) return;
+
+    try {
+      // Add request to trip's requests
+      const requestRef = ref(database, `tripRequests/${trip.id}_${user.uid}`);
+      await set(requestRef, {
+        userId: user.uid,
+        userName: user.name || 'Unknown User',
+        userEmail: user.email || '',
+        status: 'pending',
+        requestedAt: Date.now()
+      });
+
+      // Add trip to user's requested trips
+      const userTripRef = ref(database, `user-requests/${user.uid}/${trip.id}`);
+      await set(userTripRef, true);
+
+      toast.success('Trip request sent successfully!');
+    } catch (error) {
+      console.error('Error requesting to join trip:', error);
+      toast.error('Failed to send trip request');
+    }
+  };
+
+  // Handle cancel request
+  const handleCancelRequest = async () => {
+    if (!user || !trip) return;
+
+    try {
+      // Remove request from trip's requests
+      const requestRef = ref(database, `tripRequests/${trip.id}_${user.uid}`);
+      await remove(requestRef);
+
+      // Remove trip from user's requested trips
+      const userTripRef = ref(database, `user-requests/${user.uid}/${trip.id}`);
+      await remove(userTripRef);
+
+      toast.success('Trip request cancelled');
+    } catch (error) {
+      console.error('Error cancelling trip request:', error);
+      toast.error('Failed to cancel trip request');
+    }
+  };
+
+  // Load trip data
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
       return;
     }
-
-    // Load trip from localStorage
-    const storedTrips = localStorage.getItem('bunkride_trips');
-    if (storedTrips) {
-      const trips = JSON.parse(storedTrips);
-      const foundTrip = trips.find((t: Trip) => t.id === id);
-      setTrip(foundTrip || null);
-    }
-  }, [id, isAuthenticated, navigate]);
-
-  const handleRequestToJoin = () => {
-    console.log('handleRequestToJoin called');
-    console.log('Current trip:', trip);
-    console.log('Current user:', user);
     
-    if (!trip || !user || !user.id) {
-      console.log('Missing trip, user, or user.id');
+    if (!id) {
+      toast.error('No trip ID provided');
+      handleBack();
       return;
     }
 
-    // Debug log the comparison
-    console.log(`Comparing trip.creatorId (${trip.creatorId}) with user.id (${user.id})`);
-    
-    // Prevent users from sending requests to their own trips
-    if (trip.creatorId === user.id) {
-      console.log('User is the trip creator, showing error');
-      toast.error("Bruhhh, you're already in the trip!");
-      return;
-    }
+    // Load trip from Firebase
+    const tripRef = ref(database, `trips/${id}`);
+    onValue(tripRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setTrip({ 
+          id: snapshot.key || '', 
+          ...data 
+        } as Trip);
+      } else {
+        toast.error('Trip not found');
+        handleBack();
+      }
+    });
 
-    // Check if user already sent a request
-    const existingRequest = trip.requests?.[user.id];
-    if (existingRequest) {
-      toast.error("You have already sent a request for this trip!");
-      return;
-    }
-
-    const newRequest = {
-      userId: user.id,
-      userName: user.name || 'Unknown User',
-      userEmail: user.email || '',
-      status: 'pending' as const,
-      requestedAt: Date.now()
+    // Cleanup function
+    return () => {
+      off(tripRef);
     };
+  }, [id, isAuthenticated, navigate, handleBack]);
 
-    // Update the trip with the new request
-    const storedTrips = localStorage.getItem('bunkride_trips');
-    if (storedTrips) {
-      const trips = JSON.parse(storedTrips);
-      const updatedTrips = trips.map((t: Trip) => {
-        if (t.id === trip.id) {
-          return {
-            ...t,
-            requests: {
-              ...(t.requests || {}),
-              [user.id!]: {
-                userName: user.name || 'Unknown User',
-                userEmail: user.email || '',
-                status: 'pending',
-                requestedAt: Date.now()
-              }
-            }
-          };
-        }
-        return t;
+  const handleApproveRequest = async (userId: string) => {
+    if (!trip?.id) return;
+    
+    try {
+      // Update request status to approved
+      const requestRef = ref(database, `tripRequests/${trip.id}_${userId}`);
+      const requestData = (await get(requestRef)).val();
+      
+      await set(requestRef, {
+        ...requestData,
+        status: 'approved'
       });
-
-      localStorage.setItem('bunkride_trips', JSON.stringify(updatedTrips));
-      setTrip(prev => prev ? {
-        ...prev,
-        requests: {
-          ...(prev.requests || {}),
-          [user.id!]: {
-            userName: user.name || 'Unknown User',
-            userEmail: user.email || '',
-            status: 'pending',
-            requestedAt: Date.now()
-          }
-        }
-      } : null);
+      
+      // Add user to trip participants
+      const participantRef = ref(database, `trip-participants/${trip.id}/${userId}`);
+      await set(participantRef, true);
+      
+      toast.success('Request approved');
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Failed to approve request');
     }
-
-    toast.success("Request sent! The host will review your request.");
   };
 
+  const handleRejectRequest = async (userId: string) => {
+    if (!trip?.id) return;
+    
+    try {
+      // Update request status to rejected
+      const requestRef = ref(database, `tripRequests/${trip.id}_${userId}`);
+      const requestData = (await get(requestRef)).val();
+      
+      await set(requestRef, {
+        ...requestData,
+        status: 'rejected'
+      });
+      
+      // Remove user from trip participants if they were added
+      const participantRef = ref(database, `trip-participants/${trip.id}/${userId}`);
+      await remove(participantRef);
+      
+      toast.success('Request rejected');
+    } catch (error) {
+      console.error('Error rejecting request:', error);
+      toast.error('Failed to reject request');
+    }
+  };
+
+  // Check if user has already requested to join this trip
+  const [hasRequested, setHasRequested] = useState(false);
+  
+  // Check if user has already requested to join this trip
+  useEffect(() => {
+    if (!user?.uid || !trip?.id) return;
+    
+    const requestRef = ref(database, `tripRequests/${trip.id}_${user.uid}`);
+    onValue(requestRef, (snapshot) => {
+      setHasRequested(!!snapshot.val());
+    });
+    
+    return () => off(requestRef);
+  }, [user?.uid, trip?.id]);
+
+  // Get the status of the user's request to join this trip
   const getUserRequestStatus = () => {
-    if (!user?.id || !trip?.requests) return null;
-    const request = trip.requests[user.id];
-    return request ? { ...request, userId: user.id } : null;
+    if (!user?.uid || !trip?.requests) return null;
+    const request = trip.requests[user.uid];
+    return request ? { ...request, userId: user.uid } : null;
   };
-
   if (!isAuthenticated || !user) {
     return null;
   }
@@ -152,7 +223,7 @@ const TripDetails = () => {
               <p className="text-muted-foreground mb-4">
                 The trip you're looking for doesn't exist or has been removed.
               </p>
-              <Button onClick={() => navigate('/find-trips')}>
+              <Button onClick={handleBack}>
                 Browse Other Trips
               </Button>
             </CardContent>

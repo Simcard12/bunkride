@@ -1,5 +1,11 @@
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { format, startOfDay } from "date-fns";
+import { toast } from "sonner";
+import { ref, onValue, query, orderByChild, equalTo, set, serverTimestamp, remove, get } from "firebase/database";
+import { CalendarDays, Clock, User, Users, Eye, MapPin, DollarSign, X } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,12 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { format, startOfDay } from "date-fns";
-import { toast } from "sonner";
 import { database } from "@/firebase";
-import { ref, onValue, query, orderByChild, equalTo, set, serverTimestamp, remove, get } from "firebase/database";
-import { CalendarDays, Clock, User, Users, Eye, MapPin, DollarSign } from "lucide-react";
+import TripDetails from "./TripDetails";
 
 // Updated TripRequest and Trip interfaces
 interface TripRequest {
@@ -28,6 +30,7 @@ interface Trip {
   id: string; // Firebase key
   from: string;
   to: string;
+  destination: string; // Added destination field
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
   availableSeats: number;
@@ -45,13 +48,17 @@ interface Trip {
 const FindTrips = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [trips, setTrips] = useState<Trip[]>([]); // Raw trips from user's college
+  
+  // State for trips and filters
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [filteredTrips, setFilteredTrips] = useState<Trip[]>([]);
   const [searchDestination, setSearchDestination] = useState("");
-  // selectedTrip state seems unused, consider removing if not needed for a modal later
-  // const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [dateFilter, setDateFilter] = useState("");
   const [seatsFilter, setSeatsFilter] = useState("");
+  
+  // State for trip details modal
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
+  const [showTripDetails, setShowTripDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(true); // Added loading state
 
   useEffect(() => {
@@ -98,6 +105,9 @@ const FindTrips = () => {
   useEffect(() => {
     // This effect now filters the `trips` state which is already pre-filtered by college, status, date, and creator.
     let currentFilteredTrips = [...trips];
+    
+    // First filter out trips with 0 available seats
+    currentFilteredTrips = currentFilteredTrips.filter(trip => trip.availableSeats > 0);
 
     if (searchDestination) {
       currentFilteredTrips = currentFilteredTrips.filter(trip => 
@@ -118,10 +128,30 @@ const FindTrips = () => {
     setFilteredTrips(currentFilteredTrips);
   }, [trips, searchDestination, dateFilter, seatsFilter]);
 
-  // Helper to get current user's request for a trip
-  const getUserRequest = (trip: Trip): TripRequest | null => {
-    if (!user || !user.id || !trip.requests) return null;
+  // Get request status for a specific trip
+  const getRequestStatus = (tripId: string) => {
+    if (!user?.id) return null;
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip?.requests) return null;
     return trip.requests[user.id] || null;
+  };
+  
+  // Get current user's request for a trip (legacy, keeping for backward compatibility)
+  const getUserRequest = (trip: Trip): TripRequest | null => {
+    if (!user?.id || !trip.requests) return null;
+    return trip.requests[user.id] || null;
+  };
+
+  // Handle view details for a trip
+  const handleViewDetails = (trip: Trip) => {
+    setSelectedTrip(trip);
+    setShowTripDetails(true);
+  };
+
+  // Close the trip details modal
+  const handleCloseTripDetails = () => {
+    setShowTripDetails(false);
+    setSelectedTrip(null);
   };
 
   const handleRequestToJoin = async (trip: Trip) => {
@@ -142,7 +172,7 @@ const FindTrips = () => {
       return;
     }
 
-    const existingUserRequest = getUserRequest(trip);
+    const existingUserRequest = getRequestStatus(trip.id);
     if (existingUserRequest) {
       toast.info(`You have already sent a '${existingUserRequest.status}' request for this trip.`);
       return;
@@ -445,6 +475,30 @@ const FindTrips = () => {
           )}
         </div>
       </div>
+
+      {/* Trip Details Dialog */}
+      {selectedTrip && (
+        <Dialog open={showTripDetails} onOpenChange={setShowTripDetails}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">
+                Trip from {selectedTrip.from} to {selectedTrip.to}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                className="absolute right-4 top-4"
+                onClick={handleCloseTripDetails}
+                size="icon"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogHeader>
+            <div className="py-4">
+              <TripDetails />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
