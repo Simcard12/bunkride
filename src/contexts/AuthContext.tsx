@@ -7,6 +7,8 @@ import {
   onAuthStateChanged,
   sendEmailVerification,
   signOut,
+  setPersistence,
+  browserLocalPersistence,
 } from 'firebase/auth';
 import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from '../firebase'; // Corrected path
@@ -112,6 +114,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
+      // Set persistence to LOCAL to keep user logged in across page refreshes
+      await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
