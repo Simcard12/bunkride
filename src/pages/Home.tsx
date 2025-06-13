@@ -22,7 +22,7 @@ const Home = () => {
       <section className="pt-20 pb-16 px-4">
         <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-6">
-            Hassle free Travel
+           Smart Travel Coordination
             <br />
             <span className="text-4xl md:text-5xl">just for Students</span>
           </h1>
