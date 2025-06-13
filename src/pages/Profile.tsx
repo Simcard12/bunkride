@@ -43,8 +43,13 @@ const Profile = () => {
     joined: 0
   });
 
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, user, navigate]);
+
   if (!isAuthenticated || !user) {
-    navigate('/login');
     return null;
   }
 

@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
@@ -9,8 +10,13 @@ const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
   if (isAuthenticated) {
-    navigate('/dashboard');
     return null;
   }
 
