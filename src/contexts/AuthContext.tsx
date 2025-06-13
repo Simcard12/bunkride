@@ -9,6 +9,9 @@ import {
   signOut,
   setPersistence,
   browserLocalPersistence,
+  updatePassword as firebaseUpdatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from '../firebase'; // Corrected path
@@ -26,6 +29,10 @@ interface AppUser {
   profilePicture?: string;
   photoURL?: string; // Alias for profilePicture to match Firebase User
   year?: string;
+  privacySettings?: {
+    showFullName: boolean;
+    showYear: boolean;
+  };
 }
 
 // Data expected by the signup function
@@ -47,6 +54,7 @@ interface AuthContextType {
   signup: (userData: SignupData) => Promise<boolean>;
   logout: () => void;
   sendVerificationEmail: () => Promise<void>;
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,9 +89,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Profile doesn't exist, might be an issue or first login after verification
             toast.error('User profile not found. Please contact support or try logging in again.');
             await signOut(auth); // Log them out from Firebase
-            setUser(null);
-            setFirebaseUser(null);
-            setIsAuthenticated(false);
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
@@ -231,8 +236,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const updatePassword = async (currentPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      if (!firebaseUser || !firebaseUser.email) {
+        return { success: false, message: 'User not authenticated' };
+      }
+
+      // Re-authenticate user
+      const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+      await reauthenticateWithCredential(firebaseUser, credential);
+      
+      // Update password
+      await firebaseUpdatePassword(firebaseUser, newPassword);
+      return { success: true, message: 'Password updated successfully' };
+    } catch (error: any) {
+      console.error('Error updating password:', error);
+      let message = 'Failed to update password';
+      
+      switch (error.code) {
+        case 'auth/wrong-password':
+          message = 'Current password is incorrect';
+          break;
+        case 'auth/weak-password':
+          message = 'New password is too weak';
+          break;
+        case 'auth/requires-recent-login':
+          message = 'Please log in again to change your password';
+          break;
+      }
+      
+      return { success: false, message };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, isAuthenticated, isLoading, login, signup, logout, sendVerificationEmail }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        isAuthenticated,
+        isLoading,
+        login,
+        signup,
+        logout,
+        sendVerificationEmail,
+        updatePassword,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
