@@ -341,11 +341,18 @@ const Dashboard = () => {
   const upcomingTrips = useMemo(() => {
     return trips.filter(trip => {
       const tripDate = new Date(trip.date);
+      const isUserHost = trip.creatorId === user?.id;
+      const isUserPassenger = trip.requests && user?.id && trip.requests[user.id]?.status === 'approved';
+      
+      // Show trip if it's in the future, active, and either:
+      // 1. Has available seats, OR
+      // 2. User is the host, OR
+      // 3. User is an approved passenger
       return tripDate >= new Date() && 
-             trip.status === 'active' && 
-             trip.availableSeats > 0;  // Only include trips with available seats
+             trip.status === 'active' &&
+             (trip.availableSeats > 0 || isUserHost || isUserPassenger);
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [trips]);
+  }, [trips, user?.id]);
 
   // Format price for display
   const formatPrice = (trip: Trip) => {

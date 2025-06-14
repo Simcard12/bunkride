@@ -171,7 +171,7 @@ const TripDetails = () => {
       
       <div className="max-w-4xl mx-auto px-4 pt-24 pb-6 sm:pt-28 sm:pb-8">
         <div className="mb-6">
-          <Button variant="outline" onClick={() => navigate('/find-trips')}>
+          <Button variant="outline" onClick={() => navigate(-1)}>
             ← Back to Trips
           </Button>
         </div>
