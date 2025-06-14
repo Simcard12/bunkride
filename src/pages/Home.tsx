@@ -148,7 +148,7 @@ const Home = () => {
             Empowering students to travel together, smarter.
           </p>
           <div className="text-sm text-primary-foreground/60">
-            © 2024 BunkRide. Made for students, by students.
+            © 2025 BunkRide. Made for students, by students.
           </div>
         </div>
       </footer>
