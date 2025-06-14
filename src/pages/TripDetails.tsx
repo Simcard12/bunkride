@@ -192,8 +192,12 @@ const TripDetails = () => {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold text-primary">₹{trip.pricePerPerson}</div>
-                <div className="text-sm text-muted-foreground">per person</div>
+                <div className="text-3xl font-bold text-primary">
+                  {trip.pricePerPerson <= 0 ? 'Cost TBD' : `₹${trip.pricePerPerson}`}
+                </div>
+                {trip.pricePerPerson > 0 && (
+                  <div className="text-sm text-muted-foreground">per person</div>
+                )}
               </div>
             </div>
           </CardHeader>
@@ -238,18 +242,26 @@ const TripDetails = () => {
               <div>
                 <h3 className="font-semibold mb-3">Pricing Breakdown</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Trip Cost:</span>
-                    <span>₹{trip.pricePerPerson * trip.totalSeats}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Number of Passengers:</span>
-                    <span>{trip.totalSeats}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold pt-2 border-t">
-                    <span>Cost per Person:</span>
-                    <span>₹{trip.pricePerPerson}</span>
-                  </div>
+                  {trip.pricePerPerson > 0 ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Trip Cost:</span>
+                        <span>₹{trip.pricePerPerson * trip.totalSeats}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Number of Passengers:</span>
+                        <span>{trip.totalSeats}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold pt-2 border-t">
+                        <span>Cost per Person:</span>
+                        <span>₹{trip.pricePerPerson}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-muted-foreground">
+                      The cost will be discussed and finalized with the host.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
