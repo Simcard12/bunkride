@@ -341,7 +341,9 @@ const Dashboard = () => {
   const upcomingTrips = useMemo(() => {
     return trips.filter(trip => {
       const tripDate = new Date(trip.date);
-      return tripDate >= new Date() && trip.status === 'active';
+      return tripDate >= new Date() && 
+             trip.status === 'active' && 
+             trip.availableSeats > 0;  // Only include trips with available seats
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [trips]);
 
