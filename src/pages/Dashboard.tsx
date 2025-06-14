@@ -337,22 +337,49 @@ const Dashboard = () => {
     }
   };
 
-  // Filter and sort upcoming trips
+  // Filter and sort upcoming trips with priority order
   const upcomingTrips = useMemo(() => {
-    return trips.filter(trip => {
-      const tripDate = new Date(trip.date);
-      const isUserHost = trip.creatorId === user?.id;
-      const isUserPassenger = trip.requests && user?.id && trip.requests[user.id]?.status === 'approved';
-      
-      // Show trip if it's in the future, active, and either:
-      // 1. Has available seats, OR
-      // 2. User is the host, OR
-      // 3. User is an approved passenger
-      return tripDate >= new Date() && 
-             trip.status === 'active' &&
-             (trip.availableSeats > 0 || isUserHost || isUserPassenger);
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [trips, user?.id]);
+    if (!user) return [];
+    
+    const now = new Date();
+    
+    return trips
+      .filter(trip => {
+        const tripDate = new Date(trip.date);
+        const isUserHost = trip.creatorId === user.id;
+        const userRequest = trip.requests && trip.requests[user.id];
+        const isUserPassenger = userRequest?.status === 'approved';
+        const hasPendingRequest = userRequest?.status === 'pending';
+        
+        // Only show future, active trips where user is involved or there are seats available
+        return tripDate >= now && 
+               trip.status === 'active' &&
+               (trip.availableSeats > 0 || isUserHost || isUserPassenger || hasPendingRequest);
+      })
+      .sort((a, b) => {
+        const aDate = new Date(a.date);
+        const bDate = new Date(b.date);
+        
+        // Priority 1: Trips created by current user
+        if (a.creatorId === user.id && b.creatorId !== user.id) return -1;
+        if (a.creatorId !== user.id && b.creatorId === user.id) return 1;
+        
+        // Priority 2: Trips where user is an approved passenger
+        const aIsApproved = a.requests?.[user.id]?.status === 'approved';
+        const bIsApproved = b.requests?.[user.id]?.status === 'approved';
+        if (aIsApproved && !bIsApproved) return -1;
+        if (!aIsApproved && bIsApproved) return 1;
+        
+        // Priority 3: Trips with pending requests
+        const aIsPending = a.requests?.[user.id]?.status === 'pending';
+        const bIsPending = b.requests?.[user.id]?.status === 'pending';
+        if (aIsPending && !bIsPending) return -1;
+        if (!aIsPending && bIsPending) return 1;
+        
+        // Priority 4: Sort by date (earliest first)
+        return aDate.getTime() - bDate.getTime();
+      });
+  }, [trips, user]);
 
   // Format price for display
   const formatPrice = (trip: Trip) => {
@@ -521,8 +548,8 @@ const Dashboard = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {upcomingTrips.slice(0, 3).map((trip) => (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 -mr-2">
+                  {upcomingTrips.slice(0, 10).map((trip) => ( // Increased from 3 to 10 with scroll
                     <div 
                       key={trip.id} 
                       className="border rounded-lg p-4 hover:bg-accent/50 transition-colors w-full"
