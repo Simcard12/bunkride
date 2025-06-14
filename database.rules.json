@@ -2,7 +2,7 @@
   "rules": {
     "users": {
       "$uid": {
-        ".read": "auth != null && (auth.uid == $uid || !data.hasChildren(['email', 'password', 'tokens']))",
+        ".read": "auth != null",
         ".write": "auth != null && auth.uid == $uid",
         "name": {
           ".read": true,
@@ -21,7 +21,7 @@
           ".validate": "newData.isString()"
         },
         "email": {
-          ".read": "auth.uid == $uid",
+          ".read": true,
           ".validate": "newData.isString()"
         },
         "password": {
@@ -34,44 +34,42 @@
       }
     },
     "trips": {
-      ".read": "auth != null",
+      ".read": true,
+      ".write": "auth != null",
       ".indexOn": ["creatorCollege", "creatorId"],
       "$tripId": {
+        ".read": true,
         ".write": "auth != null",
         "requests": {
-          ".read": "auth != null && (auth.uid === data.child('userId').val() || auth.uid === data.parent().child('creatorId').val())",
-          ".write": "auth != null && (auth.uid === data.child('userId').val() || auth.uid === data.parent().child('creatorId').val())",
-          "$requestId": {
-            ".validate": "newData.hasChildren(['userId', 'userName', 'userEmail', 'status', 'requestedAt'])",
+          ".read": true,
+          ".write": "auth != null",
+          "$userId": {
             ".write": "auth != null",
+            ".validate": "newData.hasChildren(['userId', 'userName', 'userEmail', 'status', 'requestedAt'])",
             "status": {
               ".validate": "newData.isString() && (newData.val() === 'pending' || newData.val() === 'approved' || newData.val() === 'rejected')"
             },
             "userId": {
+              ".validate": "newData.val() === $userId"
+            },
+            "userName": {
               ".validate": "newData.isString()"
+            },
+            "userEmail": {
+              ".validate": "newData.isString()"
+            },
+            "requestedAt": {
+              ".validate": "newData.isNumber()"
             }
           }
-        }
-      }
-    },
-    "trips": {
-      ".read": "auth != null",
-      ".indexOn": ["creatorCollege", "creatorId"],
-      "$tripId": {
-        ".write": "auth != null && (!data.exists() || data.child('creatorId').val() === auth.uid)",
+        },
         "messages": {
-          ".read": "auth != null && (
-            root.child('trips').child($tripId).child('creatorId').val() === auth.uid ||
-            root.child('trips').child($tripId).child('passengers').child(auth.uid).exists() ||
-            root.child('trips').child($tripId).child('requests').child(auth.uid).child('status').val() === 'approved'
-          )",
+          ".read": true,
+          ".write": "auth != null",
           ".indexOn": ["timestamp"],
           "$messageId": {
-            ".read": "auth != null",
-            ".write": "auth != null && (
-              (!data.exists() && newData.child('userId').val() === auth.uid) ||
-              (data.exists() && data.child('userId').val() === auth.uid)
-            )",
+            ".read": true,
+            ".write": "auth != null",
             ".validate": "newData.hasChildren(['text', 'userId', 'userName', 'timestamp'])",
             "text": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000"
@@ -89,15 +87,8 @@
               ".validate": "newData.val() === now || newData.isNumber()"
             }
           }
-        },
-        "requests": {
-          ".read": "auth != null && (
-            root.child('trips').child($tripId).child('creatorId').val() === auth.uid ||
-            data.child('userId').val() === auth.uid
-          )",
-          ".write": "auth != null && (
-            root.child('trips').child($tripId).child('creatorId').val() === auth.uid ||
-            (newData.hasChildren() && newData.child('userId').val() === auth.uid)
-          )"
+        }
+      }
+    }
   }
 }

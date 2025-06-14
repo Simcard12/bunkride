@@ -10,6 +10,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getDatabase, ref, remove, set } from "firebase/database";
 
 interface TripRequest {
   userId: string;
@@ -40,6 +41,7 @@ const TripDetails = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -56,7 +58,49 @@ const TripDetails = () => {
     }
   }, [id, isAuthenticated, navigate]);
 
-  const handleRequestToJoin = () => {
+  const handleRemoveRequest = async () => {
+    if (!trip || !user?.id) return;
+    
+    setIsRemoving(true);
+    try {
+      // Update local storage
+      const storedTrips = localStorage.getItem('bunkride_trips');
+      if (storedTrips) {
+        const trips = JSON.parse(storedTrips);
+        const updatedTrips = trips.map((t: Trip) => {
+          if (t.id === trip.id) {
+            const updatedRequests = { ...t.requests };
+            delete updatedRequests[user.id];
+            return { ...t, requests: updatedRequests };
+          }
+          return t;
+        });
+        localStorage.setItem('bunkride_trips', JSON.stringify(updatedTrips));
+      }
+
+      // Update state
+      setTrip(prev => {
+        if (!prev) return null;
+        const updatedRequests = { ...prev.requests };
+        delete updatedRequests[user.id];
+        return { ...prev, requests: updatedRequests };
+      });
+
+      // Update Firebase
+      const db = getDatabase();
+      const requestRef = ref(db, `trips/${trip.id}/requests/${user.id}`);
+      await remove(requestRef);
+      
+      toast.success('Request removed successfully');
+    } catch (error) {
+      console.error('Error removing request:', error);
+      toast.error('Failed to remove request. Please try again.');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const handleRequestToJoin = async () => {
     console.log('handleRequestToJoin called');
     console.log('Current trip:', trip);
     console.log('Current user:', user);
@@ -128,7 +172,35 @@ const TripDetails = () => {
       } : null);
     }
 
-    toast.success("Request sent! The host will review your request.");
+    try {
+      // Update Firebase
+      const db = getDatabase();
+      const requestRef = ref(db, `trips/${trip.id}/requests/${user.id}`);
+      const requestData = {
+        userId: user.id,
+        userName: user.name || 'Unknown User',
+        userEmail: user.email || '',
+        status: 'pending',
+        requestedAt: Date.now()
+      };
+      console.log('Sending request data:', requestData);
+      await set(requestRef, requestData);
+      
+      toast.success("Request sent! The host will review your request.");
+    } catch (error) {
+      console.error('Error sending request:', error);
+      toast.error('Failed to send request. Please try again.');
+      
+      // Revert local storage changes if Firebase update fails
+      const storedTrips = localStorage.getItem('bunkride_trips');
+      if (storedTrips) {
+        const trips = JSON.parse(storedTrips);
+        const originalTrip = trips.find((t: Trip) => t.id === trip.id);
+        if (originalTrip) {
+          setTrip(originalTrip);
+        }
+      }
+    }
   };
 
   const getUserRequestStatus = () => {
@@ -305,10 +377,8 @@ const TripDetails = () => {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => {
-                            // Add functionality to remove request
-                            toast.info('Feature to remove request coming soon!');
-                          }}
+                          onClick={handleRemoveRequest}
+                          disabled={isRemoving}
                           className="text-sm text-muted-foreground hover:text-foreground"
                         >
                           Remove Request
