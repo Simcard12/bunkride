@@ -46,7 +46,9 @@ const CreateTrip = () => {
   };
 
   const calculatePricePerPerson = () => {
-    if (formData.isCostDoubtful) return -1; // -1 indicates cost is doubtful
+    if (formData.isCostDoubtful || formData.totalCost <= 0) {
+      return 0; // Return 0 if cost is doubtful or total cost is 0 or negative
+    }
     return Math.round(formData.totalCost / formData.totalSeats);
   };
 
@@ -282,7 +284,19 @@ const CreateTrip = () => {
                         type="number"
                         placeholder="Total estimated cost for the trip"
                         value={formData.totalCost}
-                        onChange={(e) => handleInputChange('totalCost', parseInt(e.target.value) || 0)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // Only update if the value is a valid number or empty string
+                          if (value === '' || /^\d+$/.test(value)) {
+                            handleInputChange('totalCost', value === '' ? '' : parseInt(value, 10));
+                          }
+                        }}
+                        onBlur={(e) => {
+                          // When input loses focus, ensure we have a valid minimum value
+                          if (!e.target.value || parseInt(e.target.value, 10) < 100) {
+                            handleInputChange('totalCost', 100);
+                          }
+                        }}
                         min="100"
                         step="50"
                         required
